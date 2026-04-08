@@ -13,6 +13,10 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'monospace'],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -46,6 +50,17 @@ export default {
         card: {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
+        },
+        "surface-elevated": "hsl(var(--surface-elevated))",
+        badge: {
+          info: "hsl(var(--badge-info))",
+          "info-foreground": "hsl(var(--badge-info-foreground))",
+          success: "hsl(var(--badge-success))",
+          "success-foreground": "hsl(var(--badge-success-foreground))",
+          warning: "hsl(var(--badge-warning))",
+          "warning-foreground": "hsl(var(--badge-warning-foreground))",
+          neutral: "hsl(var(--badge-neutral))",
+          "neutral-foreground": "hsl(var(--badge-neutral-foreground))",
         },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
