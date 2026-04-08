@@ -1,42 +1,38 @@
-import { ParsedRow } from '@/lib/csvParser';
-import { BarChart3, Clock, Globe, Layers } from 'lucide-react';
+import { FlattenedLogEntry } from '@/lib/csvParser';
+import { BarChart3, Clock, Globe, Layers, Plane, Users } from 'lucide-react';
 
 interface LogStatsProps {
-  rows: ParsedRow[];
-  headers: string[];
+  entries: FlattenedLogEntry[];
 }
 
-const LogStats = ({ rows, headers }: LogStatsProps) => {
-  const totalRows = rows.length;
-
-  const uniqueProviders = headers.includes('provider_code')
-    ? new Set(rows.map(r => r.provider_code)).size
-    : null;
-
-  const avgProcessingTime = headers.includes('processing_time')
-    ? (rows.reduce((sum, r) => sum + (parseFloat(r.processing_time) || 0), 0) / totalRows).toFixed(1)
-    : null;
-
-  const uniqueLocales = headers.includes('locale')
-    ? new Set(rows.map(r => r.locale)).size
-    : null;
+const LogStats = ({ entries }: LogStatsProps) => {
+  const total = entries.length;
+  const uniqueProviders = new Set(entries.map(e => e.provider_code)).size;
+  const avgProcessing = (entries.reduce((s, e) => s + (parseFloat(e.processing_time) || 0), 0) / total).toFixed(1);
+  const totalTrips = entries.reduce((s, e) => s + (parseInt(e.trips_count) || 0), 0);
+  const uniqueRoutes = new Set(entries.map(e => e.route).filter(Boolean)).size;
+  const totalPax = entries.length > 0
+    ? `${entries[0].adults_count}A ${entries[0].children_count}C ${entries[0].infants_count}I`
+    : '—';
 
   const stats = [
-    { label: 'Total Entries', value: totalRows.toLocaleString(), icon: Layers },
-    uniqueProviders !== null && { label: 'Providers', value: uniqueProviders.toString(), icon: Globe },
-    avgProcessingTime !== null && { label: 'Avg Processing', value: `${avgProcessingTime}s`, icon: Clock },
-    uniqueLocales !== null && { label: 'Locales', value: uniqueLocales.toString(), icon: BarChart3 },
-  ].filter(Boolean) as { label: string; value: string; icon: React.ElementType }[];
+    { label: 'Total Entries', value: total.toLocaleString(), icon: Layers },
+    { label: 'Providers', value: uniqueProviders.toString(), icon: Globe },
+    { label: 'Avg Response', value: `${avgProcessing}s`, icon: Clock },
+    { label: 'Total Trips', value: totalTrips.toLocaleString(), icon: BarChart3 },
+    { label: 'Routes', value: uniqueRoutes.toString(), icon: Plane },
+    { label: 'Passengers', value: totalPax, icon: Users },
+  ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
       {stats.map((stat) => (
         <div key={stat.label} className="bg-card border border-border rounded-lg p-4">
-          <div className="flex items-center gap-2 text-muted-foreground mb-2">
-            <stat.icon className="w-4 h-4" />
-            <span className="text-xs font-medium uppercase tracking-wider">{stat.label}</span>
+          <div className="flex items-center gap-2 text-muted-foreground mb-1.5">
+            <stat.icon className="w-3.5 h-3.5" />
+            <span className="text-[10px] font-semibold uppercase tracking-wider">{stat.label}</span>
           </div>
-          <p className="text-2xl font-bold font-mono text-foreground">{stat.value}</p>
+          <p className="text-xl font-bold font-mono text-foreground">{stat.value}</p>
         </div>
       ))}
     </div>
