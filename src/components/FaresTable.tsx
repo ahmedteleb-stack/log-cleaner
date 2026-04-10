@@ -1,24 +1,19 @@
-import { useState, useMemo, Fragment } from 'react';
+import { useState, useMemo } from 'react';
 import { FlattenedFareEntry } from '@/lib/faresParser';
-import { ParsedRow } from '@/lib/csvParser';
-import { extractBooking, BookingExtraction } from '@/lib/bookingExtractor';
-import BookingDetailPanel from './BookingDetailPanel';
 import { getAction, getAllActionKeys, extractSummary } from '@/lib/faresActionMapper';
-import { Search, ChevronDown, ChevronRight, Filter, FileText } from 'lucide-react';
+import { Search, ChevronDown, ChevronRight, AlertTriangle, Filter } from 'lucide-react';
 import FaresRowDetail from './FaresRowDetail';
 
 interface FaresTableProps {
   entries: FlattenedFareEntry[];
-  rawRows: ParsedRow[];
 }
 
-const FaresTable = ({ entries, rawRows }: FaresTableProps) => {
+const FaresTable = ({ entries }: FaresTableProps) => {
   const [filter, setFilter] = useState('');
   const [page, setPage] = useState(0);
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
   const [selectedActions, setSelectedActions] = useState<Set<string>>(new Set());
   const [showActionFilter, setShowActionFilter] = useState(false);
-  const [extractedBooking, setExtractedBooking] = useState<BookingExtraction | null>(null);
   const perPage = 50;
 
   // Enrich entries with actions
@@ -83,14 +78,6 @@ const FaresTable = ({ entries, rawRows }: FaresTableProps) => {
   const formatTime = (ts: string) => {
     if (!ts) return '—';
     try { return new Date(ts).toLocaleTimeString(); } catch { return ts; }
-  };
-
-  const handleExtractRef = (ref: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const extraction = extractBooking(rawRows, ref);
-    if (extraction) {
-      setExtractedBooking(extraction);
-    }
   };
 
   // Auto-expand error rows
@@ -214,24 +201,7 @@ const FaresTable = ({ entries, rawRows }: FaresTableProps) => {
                         }`}>{entry.statuscode}</span>
                       </td>
                       <td className="px-3 py-2.5 font-mono text-xs text-foreground whitespace-nowrap">{formatTime(entry.timestamp)}</td>
-                      <td className="px-3 py-2.5 font-mono text-[10px] text-primary">
-                        <div className="flex items-center gap-1">
-                          {entry.bookingRef ? (
-                            <>
-                              <button
-                                title="View Booking Summary"
-                                onClick={(e) => handleExtractRef(entry.bookingRef, e)}
-                                className="p-1 rounded hover:bg-primary/20 text-primary transition-colors"
-                              >
-                                <FileText className="w-3 h-3" />
-                              </button>
-                              <span>{entry.bookingRef}</span>
-                            </>
-                          ) : (
-                            entry.paymentorderid || '—'
-                          )}
-                        </div>
-                      </td>
+                      <td className="px-3 py-2.5 font-mono text-[10px] text-primary">{entry.bookingRef || entry.paymentorderid || '—'}</td>
                     </tr>
                     {(expanded || hasError) && (
                       <tr>
@@ -262,12 +232,10 @@ const FaresTable = ({ entries, rawRows }: FaresTableProps) => {
           </button>
         </div>
       )}
-
-      {extractedBooking && (
-        <BookingDetailPanel extraction={extractedBooking} onClose={() => setExtractedBooking(null)} />
-      )}
     </div>
   );
 };
+
+import { Fragment } from 'react';
 
 export default FaresTable;
