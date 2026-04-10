@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { FlattenedFareEntry } from '@/lib/faresParser';
-import { getAction, getAllActionKeys, extractSummary } from '@/lib/faresActionMapper';
+import { getAction, getAllActionKeys, extractDetails } from '@/lib/faresActionMapper';
 import { Search, ChevronDown, ChevronRight, AlertTriangle, Filter } from 'lucide-react';
 import FaresRowDetail from './FaresRowDetail';
 
@@ -20,7 +20,7 @@ const FaresTable = ({ entries }: FaresTableProps) => {
   const enriched = useMemo(() => entries.map((e, i) => ({
     entry: e,
     action: getAction(e),
-    summary: extractSummary(e),
+    details: extractDetails(e),
     idx: i,
   })), [entries]);
 
