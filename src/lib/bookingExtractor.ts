@@ -437,17 +437,24 @@ export function extractBooking(rows: ParsedRow[], targetRef?: string): BookingEx
   // Context for headers/cookies  
   const contextCtx = bookingCtx ?? ctxs[0];
 
+  // Fetch /v2/details if present (booking retrieval flow)
+  const detailsCtx = ctxs.filter(c => c.url.includes('/v2/details')).sort((a, b) => b.ts.localeCompare(a.ts))[0] ?? null;
+  const detailsData = detailsCtx?.rb ?? null;
+
   // Core fare data pieces
-  const trip = fareData?.trip ?? null;
-  const taxDescs: any[] = fareData?.taxDescs ?? [];
-  const baggageDescs: any[] = fareData?.baggageDescs ?? [];
-  const feeDescs: any[] = fareData?.feeDescs ?? [];
-  const brandedFares: any[] = fareData?.brandedFares ?? [];
-  const utaDescs: any[] = fareData?.utaDescs ?? [];
-  const tcViews: any[] = fareData?.termsAndConditionViews ?? [];
+  const trip = detailsData?.trip ?? fareData?.trip ?? null;
+  const taxDescs: any[] = fareData?.taxDescs ?? detailsData?.policy?.taxDescs ?? [];
+  const baggageDescs: any[] = fareData?.baggageDescs ?? detailsData?.policy?.baggageDescs ?? [];
+  const feeDescs: any[] = fareData?.feeDescs ?? detailsData?.policy?.feeDescs ?? [];
+  const brandedFares: any[] = fareData?.brandedFares ?? detailsData?.brandedFares ?? [];
+  const utaDescs: any[] = fareData?.utaDescs ?? detailsData?.policy?.utaDescs ?? [];
+  const tcViews: any[] = fareData?.termsAndConditionViews ?? detailsData?.policy?.termsAndConditionViews ?? [];
 
   // brandedFareIds from passenger-info request body
   const bfIds: string[] = passengerReq?.brandedFareIds ?? [];
+  if (bfIds.length === 0 && detailsData?.brandedFares) {
+    bfIds.push(...detailsData.brandedFares.map((bf: any) => bf.id));
+  }
 
   // Match branded fares for each leg
   let leg1BF: any = null, leg2BF: any = null;
@@ -472,11 +479,11 @@ export function extractBooking(rows: ParsedRow[], targetRef?: string): BookingEx
 
   // ── 1. Booking Metadata ───────────────────────────────────────────────────
 
-  const paymentOrderId = s(bookingData?.paymentOrderId) ?? s(bookingCtx?.payOrderId) ?? null;
-  const createdAt = s(bookingData?.createdAt);
-  const expiredAt = s(bookingData?.expiredAt) ?? s(statusData?.expiredAt) ?? null;
-  const payStatusCode = s(payData?.statusCode) ?? 'PENDING';
-  const bookingStatus = statusData?.responseCode === 10000 ? 'CONFIRMED' : 'PENDING';
+  const paymentOrderId = detailsData?.wegoOrderId ?? s(bookingData?.paymentOrderId) ?? s(bookingCtx?.payOrderId) ?? null;
+  const createdAt = s(detailsData?.createdAt) ?? s(bookingData?.createdAt);
+  const expiredAt = s(detailsData?.expiredAt) ?? s(bookingData?.expiredAt) ?? s(statusData?.expiredAt) ?? null;
+  const payStatusCode = s(detailsData?.paymentStatus) ?? s(payData?.statusCode) ?? 'PENDING';
+  const bookingStatus = s(detailsData?.status) ?? (statusData?.responseCode === 10000 ? 'CONFIRMED' : 'PENDING');
 
   const booking_metadata: BookingExtraction['booking_metadata'] = {
     bookingRef: ref,
@@ -497,34 +504,36 @@ export function extractBooking(rows: ParsedRow[], targetRef?: string): BookingEx
 
   // ── 2. Passengers + Contact ───────────────────────────────────────────────
 
-  const passengers: BookingPassenger[] = (passengerReq?.passengers ?? []).map((p: any) => {
-    const doc = p.passengerDocument;
-    // Try to get passengerId from baggage ancillary response
+  const rawPassengers = detailsData?.passengers ?? passengerReq?.passengers ?? [];
+  const passengers: BookingPassenger[] = rawPassengers.map((p: any) => {
+    const doc = p.passengerDocument ?? p.document; // Support alternate structures
+    // Try to get passengerId from baggage ancillary response or detailsData
     const matchP = (baggageData?.passengers ?? []).find(
       (ap: any) => s(ap.firstName) === s(p.firstName) && s(ap.lastName) === s(p.lastName)
     );
     return {
-      id: null,
-      type: s(p.type),
+      id: s(p.id),
+      type: s(p.type ?? p.passengerType),
       gender: s(p.gender),
       firstName: s(p.firstName),
       lastName: s(p.lastName),
       dateOfBirth: s(p.dateOfBirth),
-      nationality: s(p.nationalityCountryCode),
-      documentType: doc ? s(doc.type) : null,
-      documentId: doc ? s(doc.number) : null,
-      documentExpiry: doc ? s(doc.expiryDate) : null,
-      passengerId: matchP?.passengerId ?? null,
-      frequentFlyers: [],
+      nationality: s(p.nationalityCountryCode ?? p.nationality),
+      documentType: doc ? s(doc.type ?? doc.documentType) : s(p.documentType),
+      documentId: doc ? s(doc.number ?? doc.documentId) : s(p.documentId),
+      documentExpiry: doc ? s(doc.expiryDate ?? doc.documentExpiry) : s(p.documentExpiry),
+      passengerId: s(p.passengerId) ?? matchP?.passengerId ?? null,
+      frequentFlyers: p.frequentFlyers ?? [],
     };
   });
 
-  const contact: BookingContact | null = passengerReq?.contact ? {
-    email: s(passengerReq.contact.email),
-    phonePrefix: passengerReq.contact.phonePrefix ?? null,
-    phoneCountryCode: s(passengerReq.contact.countryCode),
-    phoneNumber: s(passengerReq.contact.phoneNumber),
-    fullName: s(passengerReq.contact.fullName),
+  const rawContact = detailsData?.contact ?? passengerReq?.contact;
+  const contact: BookingContact | null = rawContact ? {
+    email: s(rawContact.email),
+    phonePrefix: rawContact.phonePrefix ?? null,
+    phoneCountryCode: s(rawContact.countryCode ?? rawContact.phoneCountryCode),
+    phoneNumber: s(rawContact.phoneNumber),
+    fullName: s(rawContact.fullName),
   } : null;
 
   // ── 3. Flights ────────────────────────────────────────────────────────────
@@ -535,17 +544,18 @@ export function extractBooking(rows: ParsedRow[], targetRef?: string): BookingEx
 
   // ── 4. Price ──────────────────────────────────────────────────────────────
 
-  const combPrice = bookingData?.price ?? null;
+  const combPrice = detailsData?.price ?? bookingData?.price ?? null;
   const leg1PI = leg1BF?.passengerInfos?.[0] ?? null;
   const leg2PI = leg2BF?.passengerInfos?.[0] ?? null;
   const leg1Price = leg1PI?.price ?? null;
   const leg2Price = leg2PI?.price ?? null;
 
-  const totalSAR: number | null = combPrice?.totalAmount ?? bookingData?.totalAmount ?? null;
-  const totalUSD: number | null = combPrice?.totalAmountUsd ?? null;
+  const totalSAR: number | null = combPrice?.totalAmount ?? combPrice?.userTotalAmount ?? bookingData?.totalAmount ?? null;
+  const totalUSD: number | null = combPrice?.totalAmountUsd ?? combPrice?.totalAmountInUsd ?? null;
 
-  const taxList: TaxEntry[] = taxDescs.map(t => ({
-    id: t.id,
+  // Extract taxes properly handling v2/details schema
+  const taxList: TaxEntry[] = (combPrice?.taxes ?? taxDescs).map((t: any) => ({
+    id: t.id ?? null,
     code: s(t.code),
     description: s(t.description),
     amount: Number(t.amount),
@@ -553,23 +563,41 @@ export function extractBooking(rows: ParsedRow[], targetRef?: string): BookingEx
     currencyCode: s(t.currencyCode),
   }));
 
-  const leg1Taxes = getTaxRefs(leg1PI, taxDescs);
-  const leg2Taxes = getTaxRefs(leg2PI, taxDescs);
+  const leg1Taxes = leg1PI?.taxes ?? getTaxRefs(leg1PI, taxDescs);
+  const leg2Taxes = leg2PI?.taxes ?? getTaxRefs(leg2PI, taxDescs);
 
-  const payments: PaymentEntry[] = payData ? [{
-    paymentMethodCode: s(payData.paymentMethodCode),
-    amountInCents: payData.totalAmountInCents ?? null,
-    amount: payData.totalAmountInCents ? Math.round(payData.totalAmountInCents) / 100 : null,
-    currencyCode: s(payData.currencyCode),
-    status: s(payData.statusCode),
-    createdAt: s(payData.createdAt),
-    orderId: s(payData.orderId),
-    id: s(payData.id),
-    threeDsEnabled: !!payData.threeDsEnabled,
-    redirectLink: s(payData.redirectLink),
-    bookingExpiredAt: s(payData.bookingExpiredAt),
-    paymentMethodName: null,
-  }] : [];
+  let payments: PaymentEntry[] = [];
+  if (detailsData?.payments?.length) {
+    payments = detailsData.payments.map((p: any) => ({
+      paymentMethodCode: s(p.paymentMethodCode),
+      amountInCents: p.amountInCents ?? null,
+      amount: p.amount ?? null,
+      currencyCode: s(p.currencyCode),
+      status: s(p.status),
+      createdAt: s(p.createdAt),
+      orderId: s(p.orderId),
+      id: s(p.id),
+      threeDsEnabled: !!p.threeDsEnabled,
+      redirectLink: s(p.redirectLink),
+      bookingExpiredAt: s(p.bookingExpiredAt),
+      paymentMethodName: s(p.paymentMethodName),
+    }));
+  } else if (payData) {
+    payments = [{
+      paymentMethodCode: s(payData.paymentMethodCode),
+      amountInCents: payData.totalAmountInCents ?? null,
+      amount: payData.totalAmountInCents ? Math.round(payData.totalAmountInCents) / 100 : null,
+      currencyCode: s(payData.currencyCode),
+      status: s(payData.statusCode),
+      createdAt: s(payData.createdAt),
+      orderId: s(payData.orderId),
+      id: s(payData.id),
+      threeDsEnabled: !!payData.threeDsEnabled,
+      redirectLink: s(payData.redirectLink),
+      bookingExpiredAt: s(payData.bookingExpiredAt),
+      paymentMethodName: null,
+    }];
+  }
 
   const price: BookingExtraction['price'] = {
     summary: {
@@ -606,7 +634,7 @@ export function extractBooking(rows: ParsedRow[], targetRef?: string): BookingEx
     source: s(b.source),
   }));
 
-  const airlineDisclaimers: { id: number; note: string }[] = (fareData?.airlineDisclaimerDescs ?? [])
+  const airlineDisclaimers: { id: number; note: string }[] = (fareData?.airlineDisclaimerDescs ?? detailsData?.policy?.airlineDisclaimerDescs ?? [])
     .map((d: any) => ({ id: d.id, note: d.note || '' }));
 
   // ── 6. Penalties ──────────────────────────────────────────────────────────
@@ -694,14 +722,14 @@ export function extractBooking(rows: ParsedRow[], targetRef?: string): BookingEx
 
   // ── 8. PNR Status ─────────────────────────────────────────────────────────
 
-  const pnr_status: BookingExtraction['pnr_status'] = statusData ? {
-    overallBookingStatus: statusData.responseCode === 10000 ? 'CONFIRMED' : 'UNKNOWN',
+  const pnr_status: BookingExtraction['pnr_status'] = statusData || detailsData ? {
+    overallBookingStatus: detailsData?.status ?? (statusData?.responseCode === 10000 ? 'CONFIRMED' : 'UNKNOWN'),
     overallTicketStatus: null,
     hasScheduleChange: false,
-    expiredAt: s(statusData.expiredAt),
-    responseCode: statusData.responseCode ?? null,
-    paymentExtension: statusData.paymentExtension ?? null,
-    itinerarySegments: itinLegs.flatMap(leg =>
+    expiredAt: s(statusData?.expiredAt ?? detailsData?.expiredAt),
+    responseCode: statusData?.responseCode ?? detailsData?.responseCode ?? null,
+    paymentExtension: statusData?.paymentExtension ?? null,
+    itinerarySegments: (statusData ? itinLegs : (detailsData?.itineraries || [])).flatMap(leg =>
       (leg.segments ?? []).map((seg: any) => ({
         departureAirportCode: s(seg.departureAirportCode),
         arrivalAirportCode: s(seg.arrivalAirportCode),
