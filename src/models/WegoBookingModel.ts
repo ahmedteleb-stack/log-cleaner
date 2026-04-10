@@ -10,7 +10,7 @@ export const CurrencyDescSchema = z.object({
 export type CurrencyDesc = z.infer<typeof CurrencyDescSchema>;
 
 export const ContactSchema = z.object({
-  email: z.string().email().or(z.string()),
+  email: z.string().email().or(z.string()).optional(),
   phonePrefix: z.number().or(z.string()).optional(),
   phoneCountryCode: z.string().optional(),
   phoneNumber: z.number().or(z.string()).optional(),
@@ -22,7 +22,7 @@ export const PassengerSchema = z.object({
   id: z.number().or(z.string()),
   passengerId: z.string().optional(),
   documentType: z.string().optional(),
-  documentId: z.string().optional(),
+  documentId: z.string().optional(), // Passport number
   type: z.string().nullable().optional(),
   titleType: z.string().optional(),
   firstName: z.string().optional(),
@@ -40,7 +40,6 @@ export const InsurancePackageSchema = z.object({
   supplier: z.string().optional(),
   amount: z.number().or(z.string()).optional(),
   currency: z.string().optional(),
-  // price object might exist as well
   price: z.object({
     amount: z.number().or(z.string()).optional(),
     currencyCode: z.string().optional(),
@@ -75,6 +74,9 @@ export type Promo = z.infer<typeof PromoSchema>;
 export const PartnerPnrStatusSchema = z.object({
   pnr: z.string(),
   status: z.string(),
+  overallTicketStatus: z.string().optional(),
+  overallBookingStatus: z.string().optional(),
+  lastSyncedAt: z.string().optional(),
 }).passthrough();
 export type PartnerPnrStatus = z.infer<typeof PartnerPnrStatusSchema>;
 
@@ -92,6 +94,7 @@ export const BrandedFareSchema = z.object({
   code: z.string(),
   name: z.string(),
   uuid: z.string().optional(),
+  calculatedPenalties: z.array(z.any()).optional(), // from prompts "calculated maximum penalties"
 }).passthrough();
 export type BrandedFare = z.infer<typeof BrandedFareSchema>;
 
@@ -105,18 +108,32 @@ export const PolicySchema = z.object({
 }).passthrough();
 export type Policy = z.infer<typeof PolicySchema>;
 
+export const AirlineScheduleChangeSchema = z.object({
+  // usually maps to new departure/arrival etc
+}).passthrough();
+
 export const SegmentSchema = z.object({
   departureAirportCode: z.string(),
   arrivalAirportCode: z.string(),
+  departureAirportName: z.string().optional(),
+  arrivalAirportName: z.string().optional(),
+  departureCityName: z.string().optional(),
+  arrivalCityName: z.string().optional(),
+  departureCountryName: z.string().optional(),
+  arrivalCountryName: z.string().optional(),
   marketingAirlineCode: z.string().optional(),
   marketingFlightNumber: z.number().or(z.string()).optional(),
+  marketingAirlineName: z.string().optional(),
+  airlineRef: z.string().optional(), // Airline PNR
   statusLabel: z.string().optional(),
   segmentTicketStatus: z.string().optional(),
   hasScheduleChange: z.boolean().optional(),
+  scheduleChanges: z.record(AirlineScheduleChangeSchema).optional(),
   changeType: z.string().optional(),
   departureDateTime: z.string().optional(),
   arrivalDateTime: z.string().optional(),
   durationMinutes: z.number().optional(),
+  stopoverDurationMinutes: z.number().optional(),
   cabin: z.string().optional(),
 }).passthrough();
 export type Segment = z.infer<typeof SegmentSchema>;
@@ -133,38 +150,88 @@ export const TripSchema = z.object({
   id: z.string().nullable().optional(),
   providerCode: z.string().optional(),
   cabinCode: z.string().optional(),
-  legs: z.array(z.any()).optional(), // Can expand if needed
+  legs: z.array(z.any()).optional(),
 }).passthrough();
 export type Trip = z.infer<typeof TripSchema>;
 
-// --- Main Response Model ---
-// This aligns strictly with the Swift `BookingResponse` structure specified.
+export const BaggageRuleSchema = z.object({
+  type: z.string(), // "CHECK_IN" or "CABIN"
+  weight: z.number().optional(),
+  unit: z.string().optional(),
+  pieceCount: z.number().optional(),
+  weightDescription: z.string().optional(),
+  dimensionDescription: z.string().optional(),
+}).passthrough();
+export type BaggageRule = z.infer<typeof BaggageRuleSchema>;
 
+export const TaxSchema = z.object({
+  amount: z.number(),
+  code: z.string(),
+  description: z.string(),
+  currencyCode: z.string(),
+  amountUsd: z.number().optional(),
+}).passthrough();
+
+export const PriceSummarySchema = z.object({
+  userBaseAmount: z.number().optional(),
+  userTaxAmount: z.number().optional(),
+  userTotalBookingFee: z.number().optional(),
+  userTotalAmount: z.number().optional(),
+  userCurrencyCode: z.string().optional(),
+}).passthrough();
+
+export const PriceSchema = z.object({
+  summary: PriceSummarySchema.optional(),
+  taxes: z.array(TaxSchema).optional(),
+  payment: PaymentSchema.optional(),
+}).passthrough();
+
+export const FeeSchema = z.object({
+  amount: z.number(),
+  type: z.string(), // REFUND | EXCHANGE
+  amountInUsd: z.number().optional(),
+}).passthrough();
+export type Fee = z.infer<typeof FeeSchema>;
+
+export const PenaltiesSchema = z.object({
+  fees: z.array(FeeSchema).optional(),
+  calculated_penalties: z.array(z.any()).optional(),
+}).passthrough();
+
+// --- Main Response Model ---
 export const BookingResponseSchema = z.object({
   responseCode: z.number(),
   bookingRef: z.string(),
   status: z.string(),
   paymentStatus: z.string(),
-  itineraries: z.array(ItinerarySchema),
+  itineraries: z.array(ItinerarySchema).optional(), // making optional to handle anomalies
   refunds: z.array(RefundSchema).nullable().optional(),
-  policy: PolicySchema,
-  trip: TripSchema,
-  brandedFares: z.array(BrandedFareSchema),
-  currencyDescs: z.array(CurrencyDescSchema),
+  policy: PolicySchema.optional(),
+  trip: TripSchema.optional(),
+  brandedFares: z.array(BrandedFareSchema).optional(),
+  currencyDescs: z.array(CurrencyDescSchema).optional(),
   refundType: z.string().nullable().optional(),
-  passengers: z.array(PassengerSchema),
+  passengers: z.array(PassengerSchema).optional(),
   insurancePackages: z.array(InsurancePackageSchema).nullable().optional(),
-  payments: z.array(PaymentSchema),
+  payments: z.array(PaymentSchema).optional(),
   promos: z.array(PromoSchema).nullable().optional(),
-  contact: ContactSchema,
-  isFlightPortalBooking: z.boolean(),
+  contact: ContactSchema.optional(),
+  isFlightPortalBooking: z.boolean().optional(),
   partnerPnrStatuses: z.array(PartnerPnrStatusSchema).nullable().optional(),
-  isModifiedOffline: z.boolean(),
-  // Add catch-all for any extra properties found in standard payload
+  isModifiedOffline: z.boolean().optional(),
+  
+  // Extended fields for logging/UI
   paymentExtension: z.any().optional(),
-  price: z.any().optional(),
+  price: PriceSchema.optional(),
+  penalties: PenaltiesSchema.optional(),
+  flightFareRules: z.string().optional(), // massive fare rules text
+  fare_rules_summary: z.string().optional(),
+  baggage: z.array(BaggageRuleSchema).optional(),
+  baggage_mapping: z.array(z.array(z.array(BaggageRuleSchema))).optional(), // Handles nested passenger/leg mapping
+  flights: z.any().optional(), // from raw python logs occasionally nested here
   expiredAt: z.string().optional(),
   bookingMetadata: z.any().optional(),
+  pnr_status: z.any().optional(), // top level mapping fallback
 }).passthrough();
 
 export type BookingResponse = z.infer<typeof BookingResponseSchema>;

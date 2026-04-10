@@ -71,7 +71,7 @@ const FaresRowDetail = ({ entry, action, summary, defaultShowRaw, autoExpandErro
 
         {/* Render fully parsed details if available  */}
         {entry.bookingDetails && (
-          <BookingDetailPanel details={entry.bookingDetails} />
+          <BookingDetailPanel initialDetails={entry.bookingDetails} />
         )}
 
         {/* Raw JSON toggle */}
