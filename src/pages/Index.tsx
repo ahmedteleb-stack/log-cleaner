@@ -4,7 +4,7 @@ import LogTable from '@/components/LogTable';
 import LogStats from '@/components/LogStats';
 import FaresTable from '@/components/FaresTable';
 import FaresStats from '@/components/FaresStats';
-import { parseCSV, flattenLogEntry, FlattenedLogEntry } from '@/lib/csvParser';
+import { parseCSV, flattenLogEntry, FlattenedLogEntry, ParsedRow } from '@/lib/csvParser';
 import { parseFaresCSV, FlattenedFareEntry } from '@/lib/faresParser';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { FileText, X, Search, CreditCard, Link2 } from 'lucide-react';
@@ -13,6 +13,7 @@ const Index = () => {
   const [searchEntries, setSearchEntries] = useState<FlattenedLogEntry[]>([]);
   const [searchFileName, setSearchFileName] = useState<string | null>(null);
   const [faresEntries, setFaresEntries] = useState<FlattenedFareEntry[]>([]);
+  const [faresRawRows, setFaresRawRows] = useState<ParsedRow[]>([]);
   const [faresFileName, setFaresFileName] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('search');
 
@@ -25,14 +26,15 @@ const Index = () => {
   };
 
   const handleFaresFileLoaded = (content: string, name: string) => {
-    const entries = parseFaresCSV(content);
+    const { entries, rawRows } = parseFaresCSV(content);
     setFaresEntries(entries);
+    setFaresRawRows(rawRows);
     setFaresFileName(name);
     setActiveTab('fares');
   };
 
   const handleClearSearch = () => { setSearchEntries([]); setSearchFileName(null); };
-  const handleClearFares = () => { setFaresEntries([]); setFaresFileName(null); };
+  const handleClearFares = () => { setFaresEntries([]); setFaresRawRows([]); setFaresFileName(null); };
 
   const hasAnyData = searchEntries.length > 0 || faresEntries.length > 0;
 
@@ -164,7 +166,7 @@ const Index = () => {
 
               <TabsContent value="fares" className="space-y-6">
                 <FaresStats entries={faresEntries} />
-                <FaresTable entries={faresEntries} />
+                <FaresTable entries={faresEntries} rawRows={faresRawRows} />
               </TabsContent>
             </Tabs>
           </>

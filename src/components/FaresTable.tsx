@@ -1,20 +1,25 @@
 import { useState, useMemo } from 'react';
 import { FlattenedFareEntry } from '@/lib/faresParser';
+import { ParsedRow } from '@/lib/csvParser';
+import { extractBooking, BookingExtraction } from '@/lib/bookingExtractor';
 import FaresDetailPanel from './FaresDetailPanel';
-import { Search, ChevronUp, ChevronDown, AlertTriangle, Plane, Shield, CreditCard } from 'lucide-react';
+import BookingDetailPanel from './BookingDetailPanel';
+import { Search, ChevronUp, ChevronDown, AlertTriangle, Plane, Shield, CreditCard, FileText } from 'lucide-react';
 
 interface FaresTableProps {
   entries: FlattenedFareEntry[];
+  rawRows: ParsedRow[];
 }
 
 type SortDir = 'asc' | 'desc';
 
-const FaresTable = ({ entries }: FaresTableProps) => {
+const FaresTable = ({ entries, rawRows }: FaresTableProps) => {
   const [filter, setFilter] = useState('');
   const [sortCol, setSortCol] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [page, setPage] = useState(0);
   const [selectedEntry, setSelectedEntry] = useState<FlattenedFareEntry | null>(null);
+  const [extractedBooking, setExtractedBooking] = useState<BookingExtraction | null>(null);
   const perPage = 30;
 
   const filtered = useMemo(() => {
@@ -71,6 +76,14 @@ const FaresTable = ({ entries }: FaresTableProps) => {
   const formatTime = (ts: string) => {
     if (!ts) return '—';
     try { return new Date(ts).toLocaleTimeString(); } catch { return ts; }
+  };
+
+  const handleExtractRef = (ref: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const extraction = extractBooking(rawRows, ref);
+    if (extraction) {
+      setExtractedBooking(extraction);
+    }
   };
 
   return (
@@ -160,7 +173,24 @@ const FaresTable = ({ entries }: FaresTableProps) => {
                     }`}>{entry.method}</span>
                   </td>
                   <td className="px-2 py-2 text-xs font-medium text-foreground whitespace-nowrap">{entry.endpointType}</td>
-                  <td className="px-2 py-2 font-mono text-[10px] text-primary max-w-[100px] truncate">{entry.bookingRef || '—'}</td>
+                  <td className="px-2 py-2 font-mono text-[10px] text-primary max-w-[100px] truncate">
+                    <div className="flex items-center gap-1">
+                      {entry.bookingRef ? (
+                        <>
+                          <button
+                            title="View Booking Summary"
+                            onClick={(e) => handleExtractRef(entry.bookingRef, e)}
+                            className="p-1 rounded hover:bg-primary/20 text-primary transition-colors"
+                          >
+                            <FileText className="w-3 h-3" />
+                          </button>
+                          <span>{entry.bookingRef}</span>
+                        </>
+                      ) : (
+                        '—'
+                      )}
+                    </div>
+                  </td>
                   <td className="px-2 py-2 font-mono text-[10px] text-muted-foreground max-w-[100px] truncate">{entry.paymentorderid || '—'}</td>
                   <td className="px-2 py-2 font-mono text-xs text-foreground whitespace-nowrap">{formatTime(entry.timestamp)}</td>
                   {/* Context */}
@@ -239,6 +269,10 @@ const FaresTable = ({ entries }: FaresTableProps) => {
 
       {selectedEntry && (
         <FaresDetailPanel entry={selectedEntry} onClose={() => setSelectedEntry(null)} />
+      )}
+      
+      {extractedBooking && (
+        <BookingDetailPanel extraction={extractedBooking} onClose={() => setExtractedBooking(null)} />
       )}
     </div>
   );

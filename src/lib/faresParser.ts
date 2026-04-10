@@ -278,9 +278,9 @@ function summarizeRequestBody(body: string): string {
   return `{${keys.join(', ')}}`;
 }
 
-export function parseFaresCSV(text: string): FlattenedFareEntry[] {
+export function parseFaresCSV(text: string): { entries: FlattenedFareEntry[], rawRows: ParsedRow[] } {
   const { rows } = parseCSV(text);
-  return rows.map(row => flattenFareEntry(row));
+  return { entries: rows.map(row => flattenFareEntry(row)), rawRows: rows };
 }
 
 export function flattenFareEntry(row: ParsedRow): FlattenedFareEntry {
