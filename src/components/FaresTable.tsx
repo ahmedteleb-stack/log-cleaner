@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { FlattenedFareEntry } from '@/lib/faresParser';
 import { getAction, getAllActionKeys, extractDetails } from '@/lib/faresActionMapper';
-import { Search, ChevronDown, ChevronRight, AlertTriangle, Filter } from 'lucide-react';
+import { Search, ChevronDown, ChevronRight, Filter } from 'lucide-react';
 import FaresRowDetail from './FaresRowDetail';
 
 interface FaresTableProps {
@@ -38,8 +38,7 @@ const FaresTable = ({ entries }: FaresTableProps) => {
         e.entry.paymentorderid.toLowerCase().includes(lower) ||
         e.entry.errorMessage.toLowerCase().includes(lower) ||
         e.entry.statuscode.includes(lower) ||
-        e.entry.route.toLowerCase().includes(lower) ||
-        e.summary.some(s => s.toLowerCase().includes(lower))
+        e.entry.route.toLowerCase().includes(lower)
       );
     }
     return result;
@@ -164,7 +163,7 @@ const FaresTable = ({ entries }: FaresTableProps) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {paged.map(({ entry, action, summary, idx }) => {
+              {paged.map(({ entry, action, details, idx }) => {
                 const expanded = expandedRows.has(idx);
                 const hasError = isError(entry);
                 return (
