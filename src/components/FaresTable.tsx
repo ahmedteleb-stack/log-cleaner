@@ -186,8 +186,22 @@ const FaresTable = ({ entries }: FaresTableProps) => {
                         </span>
                       </td>
                       <td className="px-3 py-2.5 max-w-[400px]">
-                        {summary.length > 0 ? (
-                          <span className="text-xs text-muted-foreground truncate block">{summary[0]}</span>
+                        {details.legs && details.legs.length > 0 ? (
+                          <span className="text-xs text-muted-foreground truncate block">
+                            {details.legs.map(l => `${l.departureAirportCode}→${l.arrivalAirportCode}`).join(' · ')}
+                          </span>
+                        ) : details.passengers && details.passengers.length > 0 ? (
+                          <span className="text-xs text-muted-foreground truncate block">
+                            {details.passengers.map(p => `${p.firstName} ${p.lastName}`).join(', ')}
+                          </span>
+                        ) : details.seatAssignments && details.seatAssignments.length > 0 ? (
+                          <span className="text-xs text-muted-foreground truncate block">
+                            {details.seatAssignments.map(s => `${s.seatNumber}`).join(', ')}
+                          </span>
+                        ) : details.payment ? (
+                          <span className="text-xs text-muted-foreground truncate block">
+                            {details.payment.paymentMethodCode} ({details.payment.scheme || details.payment.cardType || ''})
+                          </span>
                         ) : (
                           <span className="text-xs text-muted-foreground/50">—</span>
                         )}
@@ -205,7 +219,7 @@ const FaresTable = ({ entries }: FaresTableProps) => {
                     {(expanded || hasError) && (
                       <tr>
                         <td colSpan={7} className="p-0">
-                          <FaresRowDetail entry={entry} action={action} summary={summary} defaultShowRaw={false} autoExpandError={hasError && !expanded} />
+                          <FaresRowDetail entry={entry} action={action} details={details} defaultShowRaw={false} autoExpandError={hasError && !expanded} />
                         </td>
                       </tr>
                     )}
