@@ -1,0 +1,369 @@
+﻿{
+    "pnr_status":  {
+                       "overallTicketStatus":  "UNUSED",
+                       "hasScheduleChange":  false,
+                       "lastSyncedAt":  "2026-04-03T05:46:25.155159358Z",
+                       "overallBookingStatus":  "CONFIRMED",
+                       "segments":  [
+                                        {
+                                            "departureAirportCode":  "DXB",
+                                            "segmentTicketStatus":  "UNUSED",
+                                            "statusLabel":  "CONFIRMED",
+                                            "arrivalAirportCode":  "DAC",
+                                            "hasScheduleChange":  false,
+                                            "marketingAirlineCode":  "EK",
+                                            "marketingFlightNumber":  586,
+                                            "scheduleChanges":  {
+
+                                                                },
+                                            "changeType":  "UNKNOWN"
+                                        },
+                                        {
+                                            "departureAirportCode":  "DAC",
+                                            "segmentTicketStatus":  "UNUSED",
+                                            "statusLabel":  "CONFIRMED",
+                                            "arrivalAirportCode":  "DXB",
+                                            "hasScheduleChange":  false,
+                                            "marketingAirlineCode":  "EK",
+                                            "marketingFlightNumber":  583,
+                                            "scheduleChanges":  {
+
+                                                                },
+                                            "changeType":  "UNKNOWN"
+                                        }
+                                    ]
+                   },
+    "booking_metadata":  {
+                             "brandedFareCode":  "1919071",
+                             "isFlightPortalBooking":  false,
+                             "paymentStatus":  "CAPTURED",
+                             "lastSyncedAt":  "2026-04-03T05:46:25.155159358Z",
+                             "brandedFareUUID":  "b1603d1a-36e6-3b57-899f-6c5e06e80cca",
+                             "bookingRef":  "WF551FPXYXM26",
+                             "createdAt":  "2026-04-02T16:41:16Z",
+                             "wegoOrderId":  "",
+                             "brandedFareName":  "Economy Saver",
+                             "tripId":  null,
+                             "status":  "CONFIRMED",
+                             "refundType":  null
+                         },
+    "penalties":  {
+                      "calculated_penalties":  [
+
+                                               ],
+                      "fee_descs":  [
+
+                                    ],
+                      "fees":  [
+                                   {
+                                       "amount":  90.0,
+                                       "type":  "REFUND",
+                                       "amountInUsd":  24.5021
+                                   },
+                                   {
+                                       "amount":  90.0,
+                                       "type":  "EXCHANGE",
+                                       "amountInUsd":  24.5021
+                                   }
+                               ]
+                  },
+    "price":  {
+                  "summary":  {
+                                  "totalAmountInUsd":  513.8245,
+                                  "baseAmountInUsd":  286.3057,
+                                  "userTotalAmount":  1887.3545,
+                                  "userCurrencyCode":  "AED",
+                                  "bookingAmountInUsd":  536.7516,
+                                  "userBaseAmount":  1051.6439,
+                                  "userTotalBookingFee":  15.7726,
+                                  "userTaxAmount":  819.938,
+                                  "taxAmountInUsd":  223.2248,
+                                  "totalBookingFeeInUsd":  4.294,
+                                  "userBookingAmount":  1971.5693
+                              },
+                  "taxes":  [
+                                {
+                                    "amount":  50.8792,
+                                    "code":  "F6",
+                                    "description":  "F6Tax",
+                                    "currencyCode":  "AED",
+                                    "amountUsd":  13.8517
+                                },
+                                {
+                                    "amount":  11.7414,
+                                    "code":  "ZR",
+                                    "description":  "ZRTax",
+                                    "currencyCode":  "AED",
+                                    "amountUsd":  3.1965
+                                },
+                                {
+                                    "amount":  121.3273,
+                                    "code":  "UT",
+                                    "description":  "UTTax",
+                                    "currencyCode":  "AED",
+                                    "amountUsd":  33.0309
+                                },
+                                {
+                                    "amount":  13.6982,
+                                    "code":  "E5",
+                                    "description":  "E5Tax",
+                                    "currencyCode":  "AED",
+                                    "amountUsd":  3.7293
+                                },
+                                {
+                                    "amount":  375.7234,
+                                    "code":  "YQ",
+                                    "description":  "YQTax",
+                                    "currencyCode":  "AED",
+                                    "amountUsd":  102.2891
+                                },
+                                {
+                                    "amount":  75.3404,
+                                    "code":  "AE",
+                                    "description":  "AETax",
+                                    "currencyCode":  "AED",
+                                    "amountUsd":  20.5111
+                                },
+                                {
+                                    "amount":  5.8707,
+                                    "code":  "TP",
+                                    "description":  "TPTax",
+                                    "currencyCode":  "AED",
+                                    "amountUsd":  1.5983
+                                },
+                                {
+                                    "amount":  75.3404,
+                                    "code":  "OW",
+                                    "description":  "OWTax",
+                                    "currencyCode":  "AED",
+                                    "amountUsd":  20.5111
+                                },
+                                {
+                                    "amount":  37.181,
+                                    "code":  "P7",
+                                    "description":  "P7Tax",
+                                    "currencyCode":  "AED",
+                                    "amountUsd":  10.1224
+                                },
+                                {
+                                    "amount":  37.181,
+                                    "code":  "P8",
+                                    "description":  "P8Tax",
+                                    "currencyCode":  "AED",
+                                    "amountUsd":  10.1224
+                                },
+                                {
+                                    "amount":  15.6551,
+                                    "code":  "BD",
+                                    "description":  "BDTax",
+                                    "currencyCode":  "AED",
+                                    "amountUsd":  4.262
+                                }
+                            ],
+                  "payment":  {
+                                  "paymentFeeAmount":  217.05,
+                                  "createdAt":  "2026-04-02T16:41:16Z",
+                                  "amount":  2104.4,
+                                  "chargedCurrencyCode":  "AED",
+                                  "cardType":  "UNKNOWN",
+                                  "chargedAmount":  2104.4,
+                                  "paymentMethodCode":  "bnpl_4_installments",
+                                  "status":  "CAPTURED",
+                                  "paymentFeeAmountInUsd":  59.09,
+                                  "paymentMethodName":  "4 interest free payments",
+                                  "amountInCents":  210440,
+                                  "amountInUsd":  572.91,
+                                  "currencyCode":  "AED"
+                              }
+              },
+    "anomalies":  [
+                      {
+                          "url":  "/metasearch/bookings/flights/v2/details",
+                          "timestamp":  "2026-04-02T16:44:17+0000",
+                          "responseCode":  50000,
+                          "errorMessage":  "",
+                          "paymentStatus":  "AUTH_PENDING"
+                      }
+                  ],
+    "baggage":  [
+
+                ],
+    "flights":  {
+                    "outbound":  {
+                                     "arrivalCountryCode":  "BD",
+                                     "departureCityName":  "Dubai",
+                                     "arrivalCountryName":  "Bangladesh",
+                                     "departureDateTime":  "2026-04-22T10:35:00+04:00",
+                                     "departureCityCode":  "DXB",
+                                     "legId":  null,
+                                     "departureTime":  "10:35",
+                                     "departureAirportCode":  "DXB",
+                                     "arrivalDateTime":  "2026-04-22T17:25:00+06:00",
+                                     "arrivalDate":  "2026-04-22",
+                                     "arrivalAirportName":  "Dhaka Hazrat Shahjalal International Airport",
+                                     "segments":  [
+                                                      {
+                                                          "designatorCode":  "EK586",
+                                                          "stopoverDurationMinutes":  0,
+                                                          "brandedfare.code":  "1919071",
+                                                          "overnight":  false,
+                                                          "departureDateTime":  "2026-04-22T10:35:00+04:00",
+                                                          "arrivalDateTime":  "2026-04-22T17:25:00+06:00",
+                                                          "marketingFlightNumber":  586,
+                                                          "marketingAirlineCode":  "EK",
+                                                          "airlineRef":  "NYAV3N",
+                                                          "durationMinutes":  290,
+                                                          "brandedfare.name":  "Economy Saver",
+                                                          "cabin":  "ECONOMY",
+                                                          "marketingAirlineName":  "Emirates"
+                                                      }
+                                                  ],
+                                     "departureDate":  "2026-04-22",
+                                     "allianceCodes":  {
+
+                                                       },
+                                     "arrivalTime":  "17:25",
+                                     "duration":  "04h 50m",
+                                     "durationMinutes":  290,
+                                     "arrivalCityName":  "Dhaka",
+                                     "status":  "SCHEDULED",
+                                     "departureCountryCode":  "AE",
+                                     "airlineCodes":  "EK",
+                                     "arrivalAirportCode":  "DAC",
+                                     "stopoversCount":  0,
+                                     "arrivalCityCode":  "DAC",
+                                     "departureAirportName":  "Dubai International Airport",
+                                     "departureCountryName":  "United Arab Emirates"
+                                 },
+                    "inbound":  {
+                                    "arrivalCountryCode":  "AE",
+                                    "departureCityName":  "Dhaka",
+                                    "arrivalCountryName":  "United Arab Emirates",
+                                    "departureDateTime":  "2026-05-31T10:15:00+06:00",
+                                    "departureCityCode":  "DAC",
+                                    "legId":  null,
+                                    "departureTime":  "10:15",
+                                    "departureAirportCode":  "DAC",
+                                    "arrivalDateTime":  "2026-05-31T13:15:00+04:00",
+                                    "arrivalDate":  "2026-05-31",
+                                    "arrivalAirportName":  "Dubai International Airport",
+                                    "segments":  [
+                                                     {
+                                                         "designatorCode":  "EK583",
+                                                         "stopoverDurationMinutes":  0,
+                                                         "brandedfare.code":  "1919071",
+                                                         "overnight":  false,
+                                                         "departureDateTime":  "2026-05-31T10:15:00+06:00",
+                                                         "arrivalDateTime":  "2026-05-31T13:15:00+04:00",
+                                                         "marketingFlightNumber":  583,
+                                                         "marketingAirlineCode":  "EK",
+                                                         "airlineRef":  "NYAV3N",
+                                                         "durationMinutes":  300,
+                                                         "brandedfare.name":  "Economy Saver",
+                                                         "cabin":  "ECONOMY",
+                                                         "marketingAirlineName":  "Emirates"
+                                                     }
+                                                 ],
+                                    "departureDate":  "2026-05-31",
+                                    "allianceCodes":  {
+
+                                                      },
+                                    "arrivalTime":  "13:15",
+                                    "duration":  "05h 00m",
+                                    "durationMinutes":  300,
+                                    "arrivalCityName":  "Dubai",
+                                    "status":  "SCHEDULED",
+                                    "departureCountryCode":  "BD",
+                                    "airlineCodes":  "EK",
+                                    "arrivalAirportCode":  "DXB",
+                                    "stopoversCount":  0,
+                                    "arrivalCityCode":  "DXB",
+                                    "departureAirportName":  "Dhaka Hazrat Shahjalal International Airport",
+                                    "departureCountryName":  "Bangladesh"
+                                }
+                },
+    "contact":  {
+                    "email":  "rahmanbayejid776@gmail.com",
+                    "phonePrefix":  971,
+                    "fullName":  "Atikur Rahman",
+                    "phoneCountryCode":  "AE",
+                    "phoneNumber":  522049008
+                },
+    "passengers":  [
+                       {
+                           "documentType":  "PASSPORT",
+                           "id":  0,
+                           "type":  null,
+                           "middleName":  "",
+                           "firstName":  "Atikur",
+                           "lastName":  "Rahman",
+                           "frequentFlyers":  {
+
+                                              },
+                           "nationality":  "BD",
+                           "dateOfBirth":  "1999-10-30",
+                           "titleType":  "MR",
+                           "passengerId":  "ATIKUR:RA:19991030",
+                           "documentId":  "A21703322"
+                       }
+                   ],
+    "fare_rules_summary":  "",
+    "baggage_mapping":  [
+                            [
+                                [
+                                    {
+                                        "type":  "CHECK_IN",
+                                        "weight":  40,
+                                        "unit":  "kg",
+                                        "pieceCount":  1,
+                                        "weightDescription":  "",
+                                        "dimensionDescription":  ""
+                                    },
+                                    {
+                                        "type":  "CABIN",
+                                        "weight":  7,
+                                        "unit":  "kg",
+                                        "pieceCount":  1,
+                                        "weightDescription":  "UPTO15LB/7KG",
+                                        "dimensionDescription":  "UPTO45LI/115LCM"
+                                    }
+                                ]
+                            ],
+                            [
+                                [
+                                    {
+                                        "type":  "CHECK_IN",
+                                        "weight":  40,
+                                        "unit":  "kg",
+                                        "pieceCount":  1,
+                                        "weightDescription":  "",
+                                        "dimensionDescription":  ""
+                                    },
+                                    {
+                                        "type":  "CABIN",
+                                        "weight":  7,
+                                        "unit":  "kg",
+                                        "pieceCount":  1,
+                                        "weightDescription":  "UPTO15LB/7KG",
+                                        "dimensionDescription":  "UPTO45LI/115LCM"
+                                    }
+                                ]
+                            ]
+                        ],
+    "client_context":  {
+                           "Origin":  "https://miniapps.wego.com",
+                           "wego_genzo_identifier_id":  null,
+                           "CF-IPCountry":  "AE",
+                           "x-requested-with":  "com.wego.android",
+                           "X-Latitude":  "25.07340",
+                           "User-Agent":  "Mozilla/5.0 (Linux; Android 16; SM-A155F Build/BP2A.250605.031.A3; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/146.0.7680.164 Mobile Safari/537.36",
+                           "CF-Connecting-IP":  "94.200.247.248",
+                           "Referer":  "https://miniapps.wego.com/",
+                           "X-Longitude":  "55.29790",
+                           "X-User-City":  "Dubai",
+                           "X-Country-Code":  "AE",
+                           "cookies":  [
+                                           "__cf_bm"
+                                       ]
+                       }
+}

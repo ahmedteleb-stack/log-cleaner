@@ -1,4 +1,5 @@
 import { parseCSV, ParsedRow } from './csvParser';
+import { safeParseBookingResponse, type BookingResponse } from '../models/WegoBookingModel';
 
 export interface FlightLeg {
   departureAirportCode: string;
@@ -101,6 +102,7 @@ export interface FlattenedFareEntry {
   _raw: ParsedRow;
   _rawResponseBody: string;
   _rawRequestBody: string;
+  bookingDetails?: BookingResponse | null;
 }
 
 function extractEndpointType(url: string): string {
@@ -120,6 +122,7 @@ function extractEndpointType(url: string): string {
   if (url.includes('/addons/insurance')) return 'Addons Insurance';
   if (url.includes('/addons')) return 'Addons';
   if (url.includes('/status')) return 'Status';
+  if (url.includes('/v2/details') || url.includes('/details')) return 'Details';
   if (url.includes('/passenger-info')) return 'Passenger Info';
   if (url.includes('/fare/') && !url.includes('/revalidate') && !url.includes('/compare')) return 'Fare';
   return url.split('/').pop() || 'Unknown';
@@ -336,6 +339,7 @@ export function flattenFareEntry(row: ParsedRow): FlattenedFareEntry {
     _raw: row,
     _rawResponseBody: responseBody,
     _rawRequestBody: requestBody,
+    bookingDetails: null,
   };
 
   if (!data) return entry;
@@ -385,6 +389,16 @@ export function flattenFareEntry(row: ParsedRow): FlattenedFareEntry {
   } else if (url.includes('/compare')) {
     const fares = data.fares || data.results || [];
     entry.compareFareCount = Array.isArray(fares) ? fares.length.toString() : '';
+  } else if (url.includes('/v2/details') || url.includes('/details')) {
+    const result = safeParseBookingResponse(responseBody);
+    if (result.success) {
+      entry.bookingDetails = result.data as BookingResponse;
+    } else {
+      console.warn("Failed to parse /v2/details", result.error);
+      // Even if parse fails totally, we might want to attach a partial object if possible,
+      // but Zod handles that.
+      entry.bookingDetails = data as unknown as BookingResponse; 
+    }
   }
 
   return entry;

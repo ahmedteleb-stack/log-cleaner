@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { FlattenedFareEntry } from '@/lib/faresParser';
 import { ActionMapping } from '@/lib/faresActionMapper';
 import { AlertTriangle, Code, Eye, EyeOff } from 'lucide-react';
+import { BookingDetailPanel } from './BookingDetailPanel';
 
 interface FaresRowDetailProps {
   entry: FlattenedFareEntry;
@@ -67,6 +68,11 @@ const FaresRowDetail = ({ entry, action, summary, defaultShowRaw, autoExpandErro
             )}
           </div>
         </div>
+
+        {/* Render fully parsed details if available  */}
+        {entry.bookingDetails && (
+          <BookingDetailPanel details={entry.bookingDetails} />
+        )}
 
         {/* Raw JSON toggle */}
         <button
