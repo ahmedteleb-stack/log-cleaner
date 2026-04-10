@@ -1,41 +1,25 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, Fragment } from 'react';
 import { FlattenedFareEntry } from '@/lib/faresParser';
-<<<<<<< HEAD
 import { ParsedRow } from '@/lib/csvParser';
 import { extractBooking, BookingExtraction } from '@/lib/bookingExtractor';
-import FaresDetailPanel from './FaresDetailPanel';
 import BookingDetailPanel from './BookingDetailPanel';
-import { Search, ChevronUp, ChevronDown, AlertTriangle, Plane, Shield, CreditCard, FileText } from 'lucide-react';
-=======
 import { getAction, getAllActionKeys, extractSummary } from '@/lib/faresActionMapper';
-import { Search, ChevronDown, ChevronRight, AlertTriangle, Filter } from 'lucide-react';
+import { Search, ChevronDown, ChevronRight, Filter, FileText } from 'lucide-react';
 import FaresRowDetail from './FaresRowDetail';
->>>>>>> 69fda0ebdba6afe3202e3eaf17acf23500a74549
 
 interface FaresTableProps {
   entries: FlattenedFareEntry[];
   rawRows: ParsedRow[];
 }
 
-<<<<<<< HEAD
-type SortDir = 'asc' | 'desc';
-
 const FaresTable = ({ entries, rawRows }: FaresTableProps) => {
-=======
-const FaresTable = ({ entries }: FaresTableProps) => {
->>>>>>> 69fda0ebdba6afe3202e3eaf17acf23500a74549
   const [filter, setFilter] = useState('');
   const [page, setPage] = useState(0);
-<<<<<<< HEAD
-  const [selectedEntry, setSelectedEntry] = useState<FlattenedFareEntry | null>(null);
-  const [extractedBooking, setExtractedBooking] = useState<BookingExtraction | null>(null);
-  const perPage = 30;
-=======
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
   const [selectedActions, setSelectedActions] = useState<Set<string>>(new Set());
   const [showActionFilter, setShowActionFilter] = useState(false);
+  const [extractedBooking, setExtractedBooking] = useState<BookingExtraction | null>(null);
   const perPage = 50;
->>>>>>> 69fda0ebdba6afe3202e3eaf17acf23500a74549
 
   // Enrich entries with actions
   const enriched = useMemo(() => entries.map((e, i) => ({
@@ -101,19 +85,18 @@ const FaresTable = ({ entries }: FaresTableProps) => {
     try { return new Date(ts).toLocaleTimeString(); } catch { return ts; }
   };
 
-<<<<<<< HEAD
   const handleExtractRef = (ref: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const extraction = extractBooking(rawRows, ref);
     if (extraction) {
       setExtractedBooking(extraction);
     }
-=======
+  };
+
   // Auto-expand error rows
   const isError = (entry: FlattenedFareEntry) => {
     const code = parseInt(entry.statuscode);
     return entry.hasError || code >= 400;
->>>>>>> 69fda0ebdba6afe3202e3eaf17acf23500a74549
   };
 
   return (
@@ -194,68 +177,6 @@ const FaresTable = ({ entries }: FaresTableProps) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-<<<<<<< HEAD
-              {paged.map((entry, i) => (
-                <tr
-                  key={i}
-                  className={`hover:bg-muted/30 transition-colors cursor-pointer ${entry.hasError ? 'bg-destructive/5' : ''}`}
-                  onClick={() => setSelectedEntry(entry)}
-                >
-                  <td className="px-2 py-2 text-xs text-muted-foreground font-mono">{page * perPage + i + 1}</td>
-                  {/* Request */}
-                  <td className="px-2 py-2">
-                    <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
-                      entry.method === 'GET' ? 'bg-badge-info text-badge-info-foreground' : 'bg-badge-warning text-badge-warning-foreground'
-                    }`}>{entry.method}</span>
-                  </td>
-                  <td className="px-2 py-2 text-xs font-medium text-foreground whitespace-nowrap">{entry.endpointType}</td>
-                  <td className="px-2 py-2 font-mono text-[10px] text-primary max-w-[100px] truncate">
-                    <div className="flex items-center gap-1">
-                      {entry.bookingRef ? (
-                        <>
-                          <button
-                            title="View Booking Summary"
-                            onClick={(e) => handleExtractRef(entry.bookingRef, e)}
-                            className="p-1 rounded hover:bg-primary/20 text-primary transition-colors"
-                          >
-                            <FileText className="w-3 h-3" />
-                          </button>
-                          <span>{entry.bookingRef}</span>
-                        </>
-                      ) : (
-                        '—'
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-2 py-2 font-mono text-[10px] text-muted-foreground max-w-[100px] truncate">{entry.paymentorderid || '—'}</td>
-                  <td className="px-2 py-2 font-mono text-xs text-foreground whitespace-nowrap">{formatTime(entry.timestamp)}</td>
-                  {/* Context */}
-                  <td className="px-2 py-2 font-mono text-xs text-foreground border-l border-border">{entry.country || '—'}</td>
-                  <td className="px-2 py-2 text-xs text-foreground">{entry.deviceInfo}</td>
-                  <td className="px-2 py-2 text-[10px] text-muted-foreground max-w-[100px] truncate">{entry.origin ? new URL(entry.origin).hostname : '—'}</td>
-                  {/* Response */}
-                  <td className="px-2 py-2 border-l border-border">
-                    <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                      entry.statuscode === '200' ? 'bg-badge-success text-badge-success-foreground' :
-                      entry.statuscode.startsWith('4') ? 'bg-badge-warning text-badge-warning-foreground' :
-                      'bg-badge-neutral text-badge-neutral-foreground'
-                    }`}>{entry.statuscode}</span>
-                  </td>
-                  <td className="px-2 py-2 font-mono text-xs font-semibold text-foreground whitespace-nowrap">
-                    {entry.route ? (
-                      <span className="flex items-center gap-1">
-                        <Plane className="w-3 h-3 text-primary shrink-0" />
-                        {entry.route}
-                      </span>
-                    ) : '—'}
-                  </td>
-                  <td className="px-2 py-2 font-mono text-xs text-foreground whitespace-nowrap">
-                    {entry.totalPrice ? `${Number(entry.totalPrice).toLocaleString()} ${entry.currencyCode}` : '—'}
-                  </td>
-                  <td className="px-2 py-2 text-center">
-                    {entry.priceChanged === 'true' && (
-                      <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-badge-warning text-badge-warning-foreground">YES</span>
-=======
               {paged.map(({ entry, action, summary, idx }) => {
                 const expanded = expandedRows.has(idx);
                 const hasError = isError(entry);
@@ -293,7 +214,24 @@ const FaresTable = ({ entries }: FaresTableProps) => {
                         }`}>{entry.statuscode}</span>
                       </td>
                       <td className="px-3 py-2.5 font-mono text-xs text-foreground whitespace-nowrap">{formatTime(entry.timestamp)}</td>
-                      <td className="px-3 py-2.5 font-mono text-[10px] text-primary">{entry.bookingRef || entry.paymentorderid || '—'}</td>
+                      <td className="px-3 py-2.5 font-mono text-[10px] text-primary">
+                        <div className="flex items-center gap-1">
+                          {entry.bookingRef ? (
+                            <>
+                              <button
+                                title="View Booking Summary"
+                                onClick={(e) => handleExtractRef(entry.bookingRef, e)}
+                                className="p-1 rounded hover:bg-primary/20 text-primary transition-colors"
+                              >
+                                <FileText className="w-3 h-3" />
+                              </button>
+                              <span>{entry.bookingRef}</span>
+                            </>
+                          ) : (
+                            entry.paymentorderid || '—'
+                          )}
+                        </div>
+                      </td>
                     </tr>
                     {(expanded || hasError) && (
                       <tr>
@@ -301,7 +239,6 @@ const FaresTable = ({ entries }: FaresTableProps) => {
                           <FaresRowDetail entry={entry} action={action} summary={summary} defaultShowRaw={false} autoExpandError={hasError && !expanded} />
                         </td>
                       </tr>
->>>>>>> 69fda0ebdba6afe3202e3eaf17acf23500a74549
                     )}
                   </Fragment>
                 );
@@ -325,21 +262,12 @@ const FaresTable = ({ entries }: FaresTableProps) => {
           </button>
         </div>
       )}
-<<<<<<< HEAD
 
-      {selectedEntry && (
-        <FaresDetailPanel entry={selectedEntry} onClose={() => setSelectedEntry(null)} />
-      )}
-      
       {extractedBooking && (
         <BookingDetailPanel extraction={extractedBooking} onClose={() => setExtractedBooking(null)} />
       )}
-=======
->>>>>>> 69fda0ebdba6afe3202e3eaf17acf23500a74549
     </div>
   );
 };
-
-import { Fragment } from 'react';
 
 export default FaresTable;
