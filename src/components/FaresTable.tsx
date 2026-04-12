@@ -1,12 +1,25 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, Fragment } from 'react';
 import { FlattenedFareEntry } from '@/lib/faresParser';
 import { getAction, getAllActionKeys, extractDetails } from '@/lib/faresActionMapper';
-import { Search, ChevronDown, ChevronRight, Filter } from 'lucide-react';
+import { deduplicateFares } from '@/lib/deduplicator';
+import { Search, ChevronDown, ChevronRight, Filter, Copy } from 'lucide-react';
 import FaresRowDetail from './FaresRowDetail';
 
 interface FaresTableProps {
   entries: FlattenedFareEntry[];
 }
+
+const SOURCE_ICON: Record<string, string> = {
+  user: '👤',
+  system: '🤖',
+  unknown: '❓',
+};
+
+const SOURCE_LABEL: Record<string, string> = {
+  user: 'Customer action',
+  system: 'System process',
+  unknown: 'Unknown',
+};
 
 const FaresTable = ({ entries }: FaresTableProps) => {
   const [filter, setFilter] = useState('');
@@ -14,6 +27,8 @@ const FaresTable = ({ entries }: FaresTableProps) => {
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
   const [selectedActions, setSelectedActions] = useState<Set<string>>(new Set());
   const [showActionFilter, setShowActionFilter] = useState(false);
+  const [hideDuplicates, setHideDuplicates] = useState(false);
+  const [hasInitializedErrors, setHasInitializedErrors] = useState(false);
   const perPage = 50;
 
   // Enrich entries with actions
@@ -24,9 +39,22 @@ const FaresTable = ({ entries }: FaresTableProps) => {
     idx: i,
   })), [entries]);
 
+  // Deduplication
+  const dedupResults = useMemo(() => deduplicateFares(entries), [entries]);
+
   // Filter
   const filtered = useMemo(() => {
-    let result = enriched;
+    let result = enriched.map((e, i) => ({
+      ...e,
+      duplicateCount: dedupResults[i]?.duplicateCount || 0,
+      isDuplicate: dedupResults[i]?.isDuplicate || false,
+    }));
+
+    // Hide duplicates
+    if (hideDuplicates) {
+      result = result.filter(e => !e.isDuplicate);
+    }
+
     if (selectedActions.size > 0) {
       result = result.filter(e => selectedActions.has(e.action.key));
     }
@@ -42,10 +70,30 @@ const FaresTable = ({ entries }: FaresTableProps) => {
       );
     }
     return result;
-  }, [enriched, filter, selectedActions]);
+  }, [enriched, filter, selectedActions, hideDuplicates, dedupResults]);
+
+  // Count duplicates for the badge
+  const totalDuplicates = useMemo(() => dedupResults.filter(d => d.isDuplicate).length, [dedupResults]);
 
   const paged = filtered.slice(page * perPage, (page + 1) * perPage);
   const totalPages = Math.ceil(filtered.length / perPage);
+
+  // Auto-expand error rows on initial load
+  useEffect(() => {
+    if (!hasInitializedErrors && enriched.length > 0) {
+      const errorIndices = new Set<number>();
+      enriched.forEach(({ entry, idx }) => {
+        const code = parseInt(entry.statuscode);
+        if (entry.hasError || code >= 400) {
+          errorIndices.add(idx);
+        }
+      });
+      if (errorIndices.size > 0) {
+        setExpandedRows(errorIndices);
+      }
+      setHasInitializedErrors(true);
+    }
+  }, [enriched, hasInitializedErrors]);
 
   const toggleRow = (idx: number) => {
     setExpandedRows(prev => {
@@ -116,6 +164,23 @@ const FaresTable = ({ entries }: FaresTableProps) => {
             <span className="text-[10px] bg-primary-foreground/20 px-1.5 py-0.5 rounded-full">{selectedActions.size}</span>
           )}
         </button>
+
+        {/* Dedup toggle */}
+        {totalDuplicates > 0 && (
+          <button
+            onClick={() => { setHideDuplicates(!hideDuplicates); setPage(0); }}
+            className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
+              hideDuplicates
+                ? 'bg-primary text-primary-foreground border-primary'
+                : 'bg-card text-foreground border-border hover:bg-muted'
+            }`}
+          >
+            <Copy className="w-3.5 h-3.5" />
+            {hideDuplicates ? 'Show Duplicates' : 'Hide Duplicates'}
+            <span className="text-[10px] bg-primary-foreground/20 px-1.5 py-0.5 rounded-full">{totalDuplicates}</span>
+          </button>
+        )}
+
         {selectedActions.size > 0 && (
           <button
             onClick={() => { setSelectedActions(new Set()); setPage(0); }}
@@ -155,6 +220,7 @@ const FaresTable = ({ entries }: FaresTableProps) => {
               <tr className="bg-muted/70 border-b border-border">
                 <th className="px-2 py-2 w-8"></th>
                 <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-primary">Step</th>
+                <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Source</th>
                 <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Action</th>
                 <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Summary</th>
                 <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Status</th>
@@ -163,7 +229,7 @@ const FaresTable = ({ entries }: FaresTableProps) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {paged.map(({ entry, action, details, idx }) => {
+              {paged.map(({ entry, action, details, idx, duplicateCount }) => {
                 const expanded = expandedRows.has(idx);
                 const hasError = isError(entry);
                 return (
@@ -173,12 +239,32 @@ const FaresTable = ({ entries }: FaresTableProps) => {
                       onClick={() => toggleRow(idx)}
                     >
                       <td className="px-2 py-2.5 text-center">
-                        {expanded
-                          ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground inline-block" />
-                          : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground inline-block" />
-                        }
+                        <div className="flex items-center gap-1">
+                          {expanded
+                            ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground inline-block" />
+                            : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground inline-block" />
+                          }
+                          {/* Pulsing dot for collapsed errors */}
+                          {hasError && !expanded && (
+                            <span className="w-2 h-2 rounded-full bg-destructive animate-pulse" title="Error — click to expand" />
+                          )}
+                        </div>
                       </td>
                       <td className="px-3 py-2.5 text-xs text-muted-foreground font-mono">{page * perPage + paged.indexOf(paged.find(p => p.idx === idx)!) + 1}</td>
+                      <td className="px-3 py-2.5 whitespace-nowrap">
+                        <span
+                          className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] ${
+                            action.source === 'user'
+                              ? 'bg-primary/15 text-primary'
+                              : action.source === 'system'
+                              ? 'bg-muted text-muted-foreground'
+                              : 'bg-muted text-muted-foreground'
+                          }`}
+                          title={SOURCE_LABEL[action.source]}
+                        >
+                          {SOURCE_ICON[action.source]}
+                        </span>
+                      </td>
                       <td className="px-3 py-2.5 whitespace-nowrap">
                         <span className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground">
                           <span className="text-base">{action.icon}</span>
@@ -186,25 +272,34 @@ const FaresTable = ({ entries }: FaresTableProps) => {
                         </span>
                       </td>
                       <td className="px-3 py-2.5 max-w-[400px]">
-                        {details.legs && details.legs.length > 0 ? (
-                          <span className="text-xs text-muted-foreground truncate block">
-                            {details.legs.map(l => `${l.departureAirportCode}→${l.arrivalAirportCode}`).join(' · ')}
-                          </span>
-                        ) : details.passengers && details.passengers.length > 0 ? (
-                          <span className="text-xs text-muted-foreground truncate block">
-                            {details.passengers.map(p => `${p.firstName} ${p.lastName}`).join(', ')}
-                          </span>
-                        ) : details.seatAssignments && details.seatAssignments.length > 0 ? (
-                          <span className="text-xs text-muted-foreground truncate block">
-                            {details.seatAssignments.map(s => `${s.seatNumber}`).join(', ')}
-                          </span>
-                        ) : details.payment ? (
-                          <span className="text-xs text-muted-foreground truncate block">
-                            {details.payment.paymentMethodCode} ({details.payment.scheme || details.payment.cardType || ''})
-                          </span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground/50">—</span>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {details.legs && details.legs.length > 0 ? (
+                            <span className="text-xs text-muted-foreground truncate block">
+                              {details.legs.map(l => `${l.departureAirportCode}→${l.arrivalAirportCode}`).join(' · ')}
+                            </span>
+                          ) : details.passengers && details.passengers.length > 0 ? (
+                            <span className="text-xs text-muted-foreground truncate block">
+                              {details.passengers.map(p => `${p.firstName} ${p.lastName}`).join(', ')}
+                            </span>
+                          ) : details.seatAssignments && details.seatAssignments.length > 0 ? (
+                            <span className="text-xs text-muted-foreground truncate block">
+                              {details.seatAssignments.map(s => `${s.seatNumber}`).join(', ')}
+                            </span>
+                          ) : details.payment ? (
+                            <span className="text-xs text-muted-foreground truncate block">
+                              {details.payment.paymentMethodCode} ({details.payment.scheme || details.payment.cardType || ''})
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground/50">—</span>
+                          )}
+                          {/* Duplicate badge */}
+                          {duplicateCount > 0 && (
+                            <span className="shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/15 text-amber-600 border border-amber-500/20" title={`${duplicateCount} duplicate(s) with same timestamp`}>
+                              <Copy className="w-2.5 h-2.5" />
+                              ×{duplicateCount}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-3 py-2.5">
                         <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold ${
@@ -216,10 +311,10 @@ const FaresTable = ({ entries }: FaresTableProps) => {
                       <td className="px-3 py-2.5 font-mono text-xs text-foreground whitespace-nowrap">{formatTime(entry.timestamp)}</td>
                       <td className="px-3 py-2.5 font-mono text-[10px] text-primary">{entry.bookingRef || entry.paymentorderid || '—'}</td>
                     </tr>
-                    {(expanded || hasError) && (
+                    {expanded && (
                       <tr>
-                        <td colSpan={7} className="p-0">
-                          <FaresRowDetail entry={entry} action={action} details={details} defaultShowRaw={false} autoExpandError={hasError && !expanded} />
+                        <td colSpan={8} className="p-0">
+                          <FaresRowDetail entry={entry} action={action} details={details} defaultShowRaw={false} />
                         </td>
                       </tr>
                     )}
@@ -248,7 +343,5 @@ const FaresTable = ({ entries }: FaresTableProps) => {
     </div>
   );
 };
-
-import { Fragment } from 'react';
 
 export default FaresTable;

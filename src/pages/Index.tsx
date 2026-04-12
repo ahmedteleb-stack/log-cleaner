@@ -6,6 +6,7 @@ import FaresTable from '@/components/FaresTable';
 import FaresStats from '@/components/FaresStats';
 import IntegrationTable from '@/components/IntegrationTable';
 import IntegrationStats from '@/components/IntegrationStats';
+import DiscrepancyPanel from '@/components/DiscrepancyPanel';
 import { parseCSV, flattenLogEntry, FlattenedLogEntry } from '@/lib/csvParser';
 import { parseFaresCSV, FlattenedFareEntry } from '@/lib/faresParser';
 import { parseIntegrationCSV, FlattenedIntegrationEntry } from '@/lib/integrationParser';
@@ -227,6 +228,7 @@ const Index = () => {
               </TabsContent>
 
               <TabsContent value="integration" className="space-y-6">
+                <DiscrepancyPanel entries={integrationEntries} />
                 <IntegrationStats entries={integrationEntries} />
                 <IntegrationTable entries={integrationEntries} />
               </TabsContent>

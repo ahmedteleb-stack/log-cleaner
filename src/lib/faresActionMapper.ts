@@ -4,25 +4,26 @@ export interface ActionMapping {
   icon: string;
   label: string;
   key: string;
+  source: 'user' | 'system' | 'unknown';
 }
 
 const ACTION_MAP: { match: (url: string, method: string) => boolean; action: ActionMapping }[] = [
-  { match: (u, m) => u.includes('/compare') && m === 'GET', action: { icon: '🔍', label: 'Fare Search', key: 'fare_search' } },
-  { match: (u, m) => u.includes('/revalidate') && m === 'GET', action: { icon: '🎫', label: 'Selected Fare Brands', key: 'revalidate' } },
-  { match: (u, m) => u.includes('/passenger-info') && m === 'POST', action: { icon: '👤', label: 'Entered Passenger Details', key: 'passenger_info' } },
-  { match: (u, m) => u.includes('/seats-availability') && m === 'GET', action: { icon: '💺', label: 'Viewed Seats', key: 'seats_view' } },
-  { match: (u, m) => u.includes('/assign-seats') && m === 'POST', action: { icon: '✅', label: 'Selected Seats', key: 'seats_select' } },
-  { match: (u, m) => u.includes('/meals/availability') && m === 'GET', action: { icon: '🍽️', label: 'Viewed Meals', key: 'meals_view' } },
-  { match: (u, m) => u.includes('/meals/assign') && m === 'POST', action: { icon: '✅', label: 'Selected Meals', key: 'meals_select' } },
-  { match: (u, m) => u.includes('/baggages/availability') && m === 'GET', action: { icon: '🧳', label: 'Viewed Baggage', key: 'baggage_view' } },
-  { match: (u, m) => u.includes('/baggages/assign') && m === 'POST', action: { icon: '✅', label: 'Added Baggage', key: 'baggage_add' } },
-  { match: (u, m) => u.includes('/addons/insurance') && m === 'GET', action: { icon: '🛡️', label: 'Viewed Insurance', key: 'insurance_view' } },
-  { match: (u, m) => u.includes('/addons/confirm') && m === 'POST', action: { icon: '✅', label: 'Purchased Insurance', key: 'insurance_confirm' } },
-  { match: (u, m) => u.includes('/payments/options') && m === 'GET', action: { icon: '💳', label: 'Viewed Payment Methods', key: 'payment_options' } },
-  { match: (u, m) => u.includes('/payments') && m === 'POST' && !u.includes('/options') && !u.includes('/order-data'), action: { icon: '💰', label: 'Initiated Payment', key: 'payment_init' } },
-  { match: (u) => u.includes('/ancillaries') && !u.includes('/seats') && !u.includes('/meals') && !u.includes('/baggages') && !u.includes('/assign'), action: { icon: '📦', label: 'Checked Ancillaries', key: 'ancillaries' } },
-  { match: (u) => u.includes('/status'), action: { icon: '📊', label: 'Checked Status', key: 'status' } },
-  { match: (u) => u.includes('/order-data'), action: { icon: '📋', label: 'Order Data', key: 'order_data' } },
+  { match: (u, m) => u.includes('/compare') && m === 'GET', action: { icon: '🔍', label: 'Fare Search', key: 'fare_search', source: 'system' } },
+  { match: (u, m) => u.includes('/revalidate') && m === 'GET', action: { icon: '🎫', label: 'Selected Fare Brands', key: 'revalidate', source: 'system' } },
+  { match: (u, m) => u.includes('/passenger-info') && m === 'POST', action: { icon: '👤', label: 'Entered Passenger Details', key: 'passenger_info', source: 'user' } },
+  { match: (u, m) => u.includes('/seats-availability') && m === 'GET', action: { icon: '💺', label: 'Viewed Seats', key: 'seats_view', source: 'system' } },
+  { match: (u, m) => u.includes('/assign-seats') && m === 'POST', action: { icon: '✅', label: 'Selected Seats', key: 'seats_select', source: 'user' } },
+  { match: (u, m) => u.includes('/meals/availability') && m === 'GET', action: { icon: '🍽️', label: 'Viewed Meals', key: 'meals_view', source: 'system' } },
+  { match: (u, m) => u.includes('/meals/assign') && m === 'POST', action: { icon: '✅', label: 'Selected Meals', key: 'meals_select', source: 'user' } },
+  { match: (u, m) => u.includes('/baggages/availability') && m === 'GET', action: { icon: '🧳', label: 'Viewed Baggage', key: 'baggage_view', source: 'system' } },
+  { match: (u, m) => u.includes('/baggages/assign') && m === 'POST', action: { icon: '✅', label: 'Added Baggage', key: 'baggage_add', source: 'user' } },
+  { match: (u, m) => u.includes('/addons/insurance') && m === 'GET', action: { icon: '🛡️', label: 'Viewed Insurance', key: 'insurance_view', source: 'system' } },
+  { match: (u, m) => u.includes('/addons/confirm') && m === 'POST', action: { icon: '✅', label: 'Purchased Insurance', key: 'insurance_confirm', source: 'user' } },
+  { match: (u, m) => u.includes('/payments/options') && m === 'GET', action: { icon: '💳', label: 'Viewed Payment Methods', key: 'payment_options', source: 'system' } },
+  { match: (u, m) => u.includes('/payments') && m === 'POST' && !u.includes('/options') && !u.includes('/order-data'), action: { icon: '💰', label: 'Initiated Payment', key: 'payment_init', source: 'user' } },
+  { match: (u) => u.includes('/ancillaries') && !u.includes('/seats') && !u.includes('/meals') && !u.includes('/baggages') && !u.includes('/assign'), action: { icon: '📦', label: 'Checked Ancillaries', key: 'ancillaries', source: 'system' } },
+  { match: (u) => u.includes('/status'), action: { icon: '📊', label: 'Checked Status', key: 'status', source: 'system' } },
+  { match: (u) => u.includes('/order-data'), action: { icon: '📋', label: 'Order Data', key: 'order_data', source: 'system' } },
 ];
 
 export function getAction(entry: FlattenedFareEntry): ActionMapping {
@@ -30,7 +31,7 @@ export function getAction(entry: FlattenedFareEntry): ActionMapping {
     if (match(entry.endpoint, entry.method)) return action;
   }
   const fallback = entry.endpoint.split('/').pop() || 'Unknown';
-  return { icon: '📄', label: fallback, key: fallback };
+  return { icon: '📄', label: fallback, key: fallback, source: 'unknown' };
 }
 
 export function getAllActionKeys(): { key: string; label: string; icon: string }[] {

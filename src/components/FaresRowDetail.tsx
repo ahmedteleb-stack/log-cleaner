@@ -8,7 +8,6 @@ interface FaresRowDetailProps {
   action: ActionMapping;
   details: ExtractedDetails;
   defaultShowRaw: boolean;
-  autoExpandError?: boolean;
 }
 
 const Section = ({ title, icon, children, defaultOpen = true }: { title: string; icon: string; children: React.ReactNode; defaultOpen?: boolean }) => {
@@ -35,7 +34,7 @@ const KV = ({ label, value, mono }: { label: string; value?: string | number | b
   );
 };
 
-const FaresRowDetail = ({ entry, action, details, defaultShowRaw, autoExpandError }: FaresRowDetailProps) => {
+const FaresRowDetail = ({ entry, action, details, defaultShowRaw }: FaresRowDetailProps) => {
   const [showRaw, setShowRaw] = useState(defaultShowRaw);
   const hasError = entry.hasError || parseInt(entry.statuscode) >= 400;
 

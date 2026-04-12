@@ -1,6 +1,7 @@
-import { useState, useMemo, Fragment } from 'react';
+import { useState, useMemo, useEffect, Fragment } from 'react';
 import { FlattenedIntegrationEntry } from '@/lib/integrationParser';
-import { Search, ChevronDown, ChevronRight, Filter, AlertTriangle } from 'lucide-react';
+import { deduplicateIntegration } from '@/lib/deduplicator';
+import { Search, ChevronDown, ChevronRight, Filter, AlertTriangle, Copy } from 'lucide-react';
 import IntegrationRowDetail from './IntegrationRowDetail';
 
 interface IntegrationTableProps {
@@ -26,13 +27,50 @@ const TYPE_LABELS: Record<string, { icon: string; label: string }> = {
   REFUND_PAYMENT: { icon: '💸', label: 'Refund Payment' },
 };
 
+// Classify integration types as user or system
+const TYPE_SOURCE: Record<string, 'user' | 'system'> = {
+  INTEGRATION_BOOKING: 'user',
+  INTEGRATION_TICKETING: 'user',
+  VAS_INSURANCE_CONFIRM: 'user',
+  INTEGRATION_VOID: 'user',
+  INTEGRATION_CANCEL: 'user',
+  INTEGRATION_DYNAMIC_FORMS: 'system',
+  INTEGRATION_REVALIDATION: 'system',
+  VAS_INSURANCE: 'system',
+  INTEGRATION_QUEUE_PLACE: 'system',
+  INTEGRATION_PNR_RETRIEVE: 'system',
+  GET_PAYMENT_DETAILS: 'system',
+  INTEGRATION_SEAT_AVAILABILITY: 'system',
+  INTEGRATION_MEAL_AVAILABILITY: 'system',
+  INTEGRATION_BAGGAGE_AVAILABILITY: 'system',
+  VOID_PAYMENT: 'system',
+  REFUND_PAYMENT: 'system',
+};
+
+const SOURCE_ICON: Record<string, string> = {
+  user: '👤',
+  system: '🤖',
+  unknown: '❓',
+};
+
+const SOURCE_LABEL: Record<string, string> = {
+  user: 'Customer action',
+  system: 'System process',
+  unknown: 'Unknown',
+};
+
 const IntegrationTable = ({ entries }: IntegrationTableProps) => {
   const [filter, setFilter] = useState('');
   const [page, setPage] = useState(0);
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
   const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set());
   const [showTypeFilter, setShowTypeFilter] = useState(false);
+  const [hideDuplicates, setHideDuplicates] = useState(false);
+  const [hasInitializedErrors, setHasInitializedErrors] = useState(false);
   const perPage = 50;
+
+  // Deduplication
+  const dedupResults = useMemo(() => deduplicateIntegration(entries), [entries]);
 
   const typeCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -42,30 +80,58 @@ const IntegrationTable = ({ entries }: IntegrationTableProps) => {
     return counts;
   }, [entries]);
 
+  const totalDuplicates = useMemo(() => dedupResults.filter(d => d.isDuplicate).length, [dedupResults]);
+
   const filtered = useMemo(() => {
-    let result = entries;
+    let result = entries.map((e, i) => ({
+      entry: e,
+      idx: i,
+      duplicateCount: dedupResults[i]?.duplicateCount || 0,
+      isDuplicate: dedupResults[i]?.isDuplicate || false,
+    }));
+
+    if (hideDuplicates) {
+      result = result.filter(e => !e.isDuplicate);
+    }
+
     if (selectedTypes.size > 0) {
-      result = result.filter(e => selectedTypes.has(e.type));
+      result = result.filter(e => selectedTypes.has(e.entry.type));
     }
     if (filter) {
       const lower = filter.toLowerCase();
       result = result.filter(e =>
-        e.type.toLowerCase().includes(lower) ||
-        e.ipcc.toLowerCase().includes(lower) ||
-        e.integrationType.toLowerCase().includes(lower) ||
-        e.route.toLowerCase().includes(lower) ||
-        e.msFareId.toLowerCase().includes(lower) ||
-        e.wegoRef.toLowerCase().includes(lower) ||
-        e.orderId.toLowerCase().includes(lower) ||
-        e.errorMessage.toLowerCase().includes(lower) ||
-        e.status.includes(lower)
+        e.entry.type.toLowerCase().includes(lower) ||
+        e.entry.ipcc.toLowerCase().includes(lower) ||
+        e.entry.integrationType.toLowerCase().includes(lower) ||
+        e.entry.route.toLowerCase().includes(lower) ||
+        e.entry.msFareId.toLowerCase().includes(lower) ||
+        e.entry.wegoRef.toLowerCase().includes(lower) ||
+        e.entry.orderId.toLowerCase().includes(lower) ||
+        e.entry.errorMessage.toLowerCase().includes(lower) ||
+        e.entry.status.includes(lower)
       );
     }
     return result;
-  }, [entries, filter, selectedTypes]);
+  }, [entries, filter, selectedTypes, hideDuplicates, dedupResults]);
 
   const paged = filtered.slice(page * perPage, (page + 1) * perPage);
   const totalPages = Math.ceil(filtered.length / perPage);
+
+  // Auto-expand error rows on initial load
+  useEffect(() => {
+    if (!hasInitializedErrors && entries.length > 0) {
+      const errorIndices = new Set<number>();
+      entries.forEach((entry, idx) => {
+        if (entry.hasError || parseInt(entry.status) >= 400) {
+          errorIndices.add(idx);
+        }
+      });
+      if (errorIndices.size > 0) {
+        setExpandedRows(errorIndices);
+      }
+      setHasInitializedErrors(true);
+    }
+  }, [entries, hasInitializedErrors]);
 
   const toggleRow = (idx: number) => {
     setExpandedRows(prev => {
@@ -92,6 +158,8 @@ const IntegrationTable = ({ entries }: IntegrationTableProps) => {
   const getTypeInfo = (type: string) => TYPE_LABELS[type] || { icon: '📄', label: type.replace(/^INTEGRATION_/, '').replace(/_/g, ' ') };
 
   const isError = (e: FlattenedIntegrationEntry) => e.hasError || parseInt(e.status) >= 400;
+
+  const getSource = (type: string): 'user' | 'system' | 'unknown' => TYPE_SOURCE[type] || 'unknown';
 
   const getSummary = (entry: FlattenedIntegrationEntry): string => {
     // Show error info prominently
@@ -145,6 +213,23 @@ const IntegrationTable = ({ entries }: IntegrationTableProps) => {
             <span className="text-[10px] bg-primary-foreground/20 px-1.5 py-0.5 rounded-full">{selectedTypes.size}</span>
           )}
         </button>
+
+        {/* Dedup toggle */}
+        {totalDuplicates > 0 && (
+          <button
+            onClick={() => { setHideDuplicates(!hideDuplicates); setPage(0); }}
+            className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
+              hideDuplicates
+                ? 'bg-primary text-primary-foreground border-primary'
+                : 'bg-card text-foreground border-border hover:bg-muted'
+            }`}
+          >
+            <Copy className="w-3.5 h-3.5" />
+            {hideDuplicates ? 'Show Duplicates' : 'Hide Duplicates'}
+            <span className="text-[10px] bg-primary-foreground/20 px-1.5 py-0.5 rounded-full">{totalDuplicates}</span>
+          </button>
+        )}
+
         {selectedTypes.size > 0 && (
           <button
             onClick={() => { setSelectedTypes(new Set()); setPage(0); }}
@@ -187,6 +272,7 @@ const IntegrationTable = ({ entries }: IntegrationTableProps) => {
               <tr className="bg-muted/70 border-b border-border">
                 <th className="px-2 py-2 w-8"></th>
                 <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-primary">Step</th>
+                <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Source</th>
                 <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Type</th>
                 <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Summary</th>
                 <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Status</th>
@@ -196,25 +282,44 @@ const IntegrationTable = ({ entries }: IntegrationTableProps) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {paged.map((entry, pageIdx) => {
-                const globalIdx = page * perPage + pageIdx;
-                const expanded = expandedRows.has(globalIdx);
+              {paged.map(({ entry, idx, duplicateCount }) => {
+                const expanded = expandedRows.has(idx);
                 const hasError = isError(entry);
                 const typeInfo = getTypeInfo(entry.type);
                 const summary = getSummary(entry);
+                const source = getSource(entry.type);
                 return (
-                  <Fragment key={globalIdx}>
+                  <Fragment key={idx}>
                     <tr
                       className={`hover:bg-muted/30 transition-colors cursor-pointer ${hasError ? 'bg-destructive/5' : ''}`}
-                      onClick={() => toggleRow(globalIdx)}
+                      onClick={() => toggleRow(idx)}
                     >
                       <td className="px-2 py-2.5 text-center">
-                        {expanded
-                          ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground inline-block" />
-                          : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground inline-block" />
-                        }
+                        <div className="flex items-center gap-1">
+                          {expanded
+                            ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground inline-block" />
+                            : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground inline-block" />
+                          }
+                          {hasError && !expanded && (
+                            <span className="w-2 h-2 rounded-full bg-destructive animate-pulse" title="Error — click to expand" />
+                          )}
+                        </div>
                       </td>
-                      <td className="px-3 py-2.5 text-xs text-muted-foreground font-mono">{globalIdx + 1}</td>
+                      <td className="px-3 py-2.5 text-xs text-muted-foreground font-mono">{idx + 1}</td>
+                      <td className="px-3 py-2.5 whitespace-nowrap">
+                        <span
+                          className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] ${
+                            source === 'user'
+                              ? 'bg-primary/15 text-primary'
+                              : source === 'system'
+                              ? 'bg-muted text-muted-foreground'
+                              : 'bg-muted text-muted-foreground'
+                          }`}
+                          title={SOURCE_LABEL[source]}
+                        >
+                          {SOURCE_ICON[source]}
+                        </span>
+                      </td>
                       <td className="px-3 py-2.5 whitespace-nowrap">
                         <span className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground">
                           <span className="text-base">{typeInfo.icon}</span>
@@ -222,13 +327,21 @@ const IntegrationTable = ({ entries }: IntegrationTableProps) => {
                         </span>
                       </td>
                       <td className="px-3 py-2.5 max-w-[400px]">
-                        {summary ? (
-                          <span className={`text-xs truncate block ${entry.responseError ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
-                            {summary}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground/50">—</span>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {summary ? (
+                            <span className={`text-xs truncate block ${entry.responseError ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
+                              {summary}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground/50">—</span>
+                          )}
+                          {duplicateCount > 0 && (
+                            <span className="shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/15 text-amber-600 border border-amber-500/20" title={`${duplicateCount} duplicate(s) with same timestamp`}>
+                              <Copy className="w-2.5 h-2.5" />
+                              ×{duplicateCount}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-3 py-2.5">
                         {entry.responseError ? (
@@ -248,9 +361,9 @@ const IntegrationTable = ({ entries }: IntegrationTableProps) => {
                       <td className="px-3 py-2.5 font-mono text-xs text-muted-foreground">{entry.timeInMs}ms</td>
                       <td className="px-3 py-2.5 font-mono text-[10px] text-primary">{entry.ipcc || '—'}</td>
                     </tr>
-                    {(expanded || hasError) && (
+                    {expanded && (
                       <tr>
-                        <td colSpan={8} className="p-0">
+                        <td colSpan={9} className="p-0">
                           <IntegrationRowDetail entry={entry} defaultExpanded={expanded} />
                         </td>
                       </tr>
