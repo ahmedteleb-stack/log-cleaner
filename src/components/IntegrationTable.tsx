@@ -1,6 +1,6 @@
 import { useState, useMemo, Fragment } from 'react';
 import { FlattenedIntegrationEntry } from '@/lib/integrationParser';
-import { Search, ChevronDown, ChevronRight, Filter } from 'lucide-react';
+import { Search, ChevronDown, ChevronRight, Filter, AlertTriangle } from 'lucide-react';
 import IntegrationRowDetail from './IntegrationRowDetail';
 
 interface IntegrationTableProps {
@@ -10,7 +10,7 @@ interface IntegrationTableProps {
 const TYPE_LABELS: Record<string, { icon: string; label: string }> = {
   INTEGRATION_DYNAMIC_FORMS: { icon: '📋', label: 'Dynamic Forms' },
   INTEGRATION_REVALIDATION: { icon: '🎫', label: 'Revalidation' },
-  INTEGRATION_BOOKING: { icon: '✅', label: 'Booking' },
+  INTEGRATION_BOOKING: { icon: '✈️', label: 'Booking' },
   VAS_INSURANCE_CONFIRM: { icon: '🛡️', label: 'Insurance Confirm' },
   VAS_INSURANCE: { icon: '🛡️', label: 'Insurance' },
   INTEGRATION_TICKETING: { icon: '🎟️', label: 'Ticketing' },
@@ -18,6 +18,12 @@ const TYPE_LABELS: Record<string, { icon: string; label: string }> = {
   INTEGRATION_CANCEL: { icon: '🚫', label: 'Cancel' },
   INTEGRATION_QUEUE_PLACE: { icon: '📥', label: 'Queue Place' },
   INTEGRATION_PNR_RETRIEVE: { icon: '🔄', label: 'PNR Retrieve' },
+  GET_PAYMENT_DETAILS: { icon: '💳', label: 'Payment Details' },
+  INTEGRATION_SEAT_AVAILABILITY: { icon: '💺', label: 'Seat Availability' },
+  INTEGRATION_MEAL_AVAILABILITY: { icon: '🍽️', label: 'Meal Availability' },
+  INTEGRATION_BAGGAGE_AVAILABILITY: { icon: '🧳', label: 'Baggage Availability' },
+  VOID_PAYMENT: { icon: '💸', label: 'Void Payment' },
+  REFUND_PAYMENT: { icon: '💸', label: 'Refund Payment' },
 };
 
 const IntegrationTable = ({ entries }: IntegrationTableProps) => {
@@ -83,9 +89,30 @@ const IntegrationTable = ({ entries }: IntegrationTableProps) => {
     try { return new Date(ts).toLocaleTimeString(); } catch { return ts; }
   };
 
-  const getTypeInfo = (type: string) => TYPE_LABELS[type] || { icon: '📄', label: type };
+  const getTypeInfo = (type: string) => TYPE_LABELS[type] || { icon: '📄', label: type.replace(/^INTEGRATION_/, '').replace(/_/g, ' ') };
 
   const isError = (e: FlattenedIntegrationEntry) => e.hasError || parseInt(e.status) >= 400;
+
+  const getSummary = (entry: FlattenedIntegrationEntry): string => {
+    // Show error info prominently
+    if (entry.responseError) {
+      return `❌ ${entry.responseError.message}`;
+    }
+    if (entry.paymentDetails) {
+      return `${entry.paymentDetails.scheme} ****${entry.paymentDetails.last4} — ${entry.paymentDetails.status} — ${entry.paymentDetails.amount.toLocaleString()} ${entry.paymentDetails.currencyCode}`;
+    }
+    if (entry.route) return entry.route;
+    if (entry.seatAvailability.length > 0) {
+      return entry.seatAvailability.map(s => `${s.segmentId}: ${s.totalSeats} seats`).join(', ');
+    }
+    if (entry.insurancePackages.length > 0) {
+      return entry.insurancePackages.map(p => `${p.type} (${p.status})`).join(', ');
+    }
+    if (entry.dynamicForms.length > 0) {
+      return entry.dynamicForms[0]?.requiredDocument || 'Forms loaded';
+    }
+    return '';
+  };
 
   return (
     <div className="space-y-4">
@@ -174,6 +201,7 @@ const IntegrationTable = ({ entries }: IntegrationTableProps) => {
                 const expanded = expandedRows.has(globalIdx);
                 const hasError = isError(entry);
                 const typeInfo = getTypeInfo(entry.type);
+                const summary = getSummary(entry);
                 return (
                   <Fragment key={globalIdx}>
                     <tr
@@ -194,35 +222,36 @@ const IntegrationTable = ({ entries }: IntegrationTableProps) => {
                         </span>
                       </td>
                       <td className="px-3 py-2.5 max-w-[400px]">
-                        {entry.route ? (
-                          <span className="text-xs text-muted-foreground truncate block">{entry.route}</span>
-                        ) : entry.insurancePackages.length > 0 ? (
-                          <span className="text-xs text-muted-foreground truncate block">
-                            {entry.insurancePackages.map(p => p.type).join(', ')}
-                          </span>
-                        ) : entry.dynamicForms.length > 0 ? (
-                          <span className="text-xs text-muted-foreground truncate block">
-                            {entry.dynamicForms[0]?.requiredDocument || 'Forms'}
+                        {summary ? (
+                          <span className={`text-xs truncate block ${entry.responseError ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
+                            {summary}
                           </span>
                         ) : (
                           <span className="text-xs text-muted-foreground/50">—</span>
                         )}
                       </td>
                       <td className="px-3 py-2.5">
-                        <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                          entry.status === '200' ? 'bg-badge-success text-badge-success-foreground' :
-                          parseInt(entry.status) >= 400 ? 'bg-destructive/20 text-destructive' :
-                          'bg-badge-neutral text-badge-neutral-foreground'
-                        }`}>{entry.status}</span>
+                        {entry.responseError ? (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-destructive/20 text-destructive">
+                            <AlertTriangle className="w-3 h-3" />
+                            {entry.responseError.category || 'ERROR'}
+                          </span>
+                        ) : (
+                          <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                            entry.status === '200' ? 'bg-badge-success text-badge-success-foreground' :
+                            parseInt(entry.status) >= 400 ? 'bg-destructive/20 text-destructive' :
+                            'bg-badge-neutral text-badge-neutral-foreground'
+                          }`}>{entry.status}</span>
+                        )}
                       </td>
                       <td className="px-3 py-2.5 font-mono text-xs text-foreground whitespace-nowrap">{formatTime(entry.requestedAt || entry.timestamp)}</td>
                       <td className="px-3 py-2.5 font-mono text-xs text-muted-foreground">{entry.timeInMs}ms</td>
                       <td className="px-3 py-2.5 font-mono text-[10px] text-primary">{entry.ipcc || '—'}</td>
                     </tr>
-                    {expanded && (
+                    {(expanded || hasError) && (
                       <tr>
                         <td colSpan={8} className="p-0">
-                          <IntegrationRowDetail entry={entry} />
+                          <IntegrationRowDetail entry={entry} defaultExpanded={expanded} />
                         </td>
                       </tr>
                     )}

@@ -280,7 +280,14 @@ function summarizeRequestBody(body: string): string {
 
 export function parseFaresCSV(text: string): FlattenedFareEntry[] {
   const { rows } = parseCSV(text);
-  return rows.map(row => flattenFareEntry(row));
+  const entries = rows.map(row => flattenFareEntry(row));
+  // Sort chronologically by timestamp
+  entries.sort((a, b) => {
+    const ta = new Date(a.timestamp || 0).getTime();
+    const tb = new Date(b.timestamp || 0).getTime();
+    return ta - tb;
+  });
+  return entries;
 }
 
 export function flattenFareEntry(row: ParsedRow): FlattenedFareEntry {
