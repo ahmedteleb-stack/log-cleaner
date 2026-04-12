@@ -19,6 +19,7 @@ export interface IntegrationSegment {
   operatingAirlineCode: string;
   operatingFlightNumber: string;
   aircraftCode?: string;
+  marriageGroup?: string;
   technicalStops: any[];
   seats: any[];
   meals: any[];
@@ -93,6 +94,11 @@ export interface IntegrationPassengerPricing {
   fees: IntegrationFee[];
 }
 
+export interface BrandFeature {
+  type: string;
+  description: string;
+}
+
 export interface IntegrationBrandedFare {
   id: string;
   legId: number;
@@ -102,6 +108,7 @@ export interface IntegrationBrandedFare {
   refundType: string;
   brandCode: string;
   brandName: string;
+  brandFeatures: BrandFeature[];
   bookingPrice?: IntegrationPrice;
   vendorPrice?: IntegrationPrice;
   adultInfo?: IntegrationPassengerPricing;
@@ -175,6 +182,24 @@ export interface IntegrationContact {
   phoneNumber: string;
   phonePrefix: string;
   countryCode: string;
+}
+
+export interface IntegrationPassenger {
+  passengerId: string;
+  type: string;
+  title: string;
+  gender: string;
+  firstName: string;
+  middleName?: string;
+  lastName: string;
+  dateOfBirth: string;
+  nationalityCountryCode: string;
+  documentType: string;
+  documentNumber: string;
+  documentIssueDate?: string;
+  documentExpiryDate?: string;
+  documentIssueCountryCode?: string;
+  frequentFlyers: any[];
 }
 
 export interface DynamicFormResult {
@@ -253,6 +278,47 @@ export interface SupplierSolution {
   carryOnAllowance: string[];
 }
 
+export interface IntegrationPaymentDetails {
+  approved: boolean;
+  status: string;
+  amount: number;
+  amountInCents: number;
+  currencyCode: string;
+  paymentMethodCode: string;
+  paymentMethodName: string;
+  scheme: string;
+  cardType: string;
+  cardCategory: string;
+  issuer: string;
+  issuerCountry: string;
+  last4: string;
+  bin: string;
+  threeDsEnabled: boolean;
+  bookingRef: string;
+  orderRef: string;
+  paymentRef: string;
+  customerEmail: string;
+  customerName: string;
+  partnerName: string;
+  partnerAccountName: string;
+  partnerAccountCode: string;
+  actions: { type: string; amount: number; approved: boolean; partnerResponseText: string; createdAt: string }[];
+}
+
+export interface ResponseError {
+  code: string;
+  message: string;
+  category: string;
+  status: string;
+}
+
+export interface SeatAvailabilityInfo {
+  segmentId: string;
+  totalSeats: number;
+  sampleSeats: { seatNumber: string; position: string; price: number; currency: string }[];
+  passengerSkippable: boolean;
+}
+
 // ── Flattened entry ──
 
 export interface FlattenedIntegrationEntry {
@@ -273,6 +339,7 @@ export interface FlattenedIntegrationEntry {
   queueNumber: string;
   hasError: boolean;
   errorMessage: string;
+  responseError?: ResponseError;
   timestamp: string;
   date: string;
 
@@ -286,6 +353,8 @@ export interface FlattenedIntegrationEntry {
   departureCountryCodes: string[];
   arrivalCountryCodes: string[];
   providerCode: string;
+  sourceType: string;
+  contentType: string;
 
   // Itinerary
   route: string;
@@ -293,6 +362,10 @@ export interface FlattenedIntegrationEntry {
   domesticFlight: boolean;
   legs: IntegrationLeg[];
   brandedFare?: IntegrationBrandedFare;
+
+  // Passengers & contact from request
+  passengers: IntegrationPassenger[];
+  contact?: IntegrationContact;
 
   // SABA pricing
   saba?: SabaDetails;
@@ -304,9 +377,6 @@ export interface FlattenedIntegrationEntry {
   // Search context
   searchContext?: IntegrationSearchContext;
 
-  // Contact
-  contact?: IntegrationContact;
-
   // Dynamic forms response
   dynamicForms: DynamicFormResult[];
 
@@ -315,6 +385,12 @@ export interface FlattenedIntegrationEntry {
 
   // Insurance
   insurancePackages: IntegrationInsurancePackage[];
+
+  // Payment details (from GET_PAYMENT_DETAILS response)
+  paymentDetails?: IntegrationPaymentDetails;
+
+  // Seat availability (from response)
+  seatAvailability: SeatAvailabilityInfo[];
 
   // Airline disclaimers
   airlineDisclaimers: string[];
@@ -353,6 +429,7 @@ function parseSegments(segs: any[]): IntegrationSegment[] {
     operatingAirlineCode: s.operatingCarrier?.airlineCode || s.operatingAirlineCode || '',
     operatingFlightNumber: s.operatingCarrier?.flightNumber || s.operatingFlightNumber || '',
     aircraftCode: s.aircraftCode || undefined,
+    marriageGroup: s.marriageGroup || undefined,
     technicalStops: s.technicalStops || [],
     seats: s.seats || [],
     meals: s.meals || [],
@@ -463,6 +540,19 @@ function parseBrandedFareFromRequest(bf: any): IntegrationBrandedFare | undefine
   const adultInfo = parsePassengerPricing(bf.adultInfo);
   const childInfo = parsePassengerPricing(bf.childInfo);
   const infantInfo = parsePassengerPricing(bf.infantInfo);
+
+  // Extract brand features from brandedLegs
+  const brandFeatures: BrandFeature[] = [];
+  if (bf.brandedLegs) {
+    for (const leg of bf.brandedLegs) {
+      if (leg.brand?.brandFeatures) {
+        for (const feat of leg.brand.brandFeatures) {
+          brandFeatures.push({ type: feat.type || '', description: feat.description || '' });
+        }
+      }
+    }
+  }
+
   return {
     id: bf.id || '',
     legId: bf.legId ?? 0,
@@ -472,6 +562,7 @@ function parseBrandedFareFromRequest(bf: any): IntegrationBrandedFare | undefine
     refundType: bf.refundType || '',
     brandCode: bf.brand?.code || '',
     brandName: bf.brand?.name || '',
+    brandFeatures,
     bookingPrice: parseIntegrationPrice(bf.bookingPrice),
     vendorPrice: parseIntegrationPrice(bf.vendorPrice),
     adultInfo,
@@ -601,6 +692,26 @@ function parseContact(req: any): IntegrationContact | undefined {
   };
 }
 
+function parsePassengers(passengers: any[]): IntegrationPassenger[] {
+  return (passengers || []).map((p: any) => ({
+    passengerId: p.passengerId || '',
+    type: p.type || '',
+    title: p.title || p.finalTitle || '',
+    gender: p.gender || '',
+    firstName: p.firstName || '',
+    middleName: p.middleName || undefined,
+    lastName: p.lastName || '',
+    dateOfBirth: p.dateOfBirth || '',
+    nationalityCountryCode: p.nationalityCountryCode || '',
+    documentType: p.passengerDocument?.type || '',
+    documentNumber: p.passengerDocument?.number || '',
+    documentIssueDate: p.passengerDocument?.issueDate || undefined,
+    documentExpiryDate: p.passengerDocument?.expiryDate || undefined,
+    documentIssueCountryCode: p.passengerDocument?.issueCountryCode || undefined,
+    frequentFlyers: p.frequentFlyers || [],
+  }));
+}
+
 function parseDynamicForms(respData: any): DynamicFormResult[] {
   const data = respData?.data || (Array.isArray(respData) ? respData : []);
   return (data || []).map((d: any) => ({
@@ -657,9 +768,92 @@ function parseAirlineDisclaimers(req: any): string[] {
   return (req?.airlineDisclaimers || []).map((d: any) => d.note?.name || d.note?.nameI18n?.en || '').filter(Boolean);
 }
 
+function parsePaymentDetails(respData: any): IntegrationPaymentDetails | undefined {
+  if (!respData || !respData.paymentRef) return undefined;
+  return {
+    approved: respData.approved ?? false,
+    status: respData.status || '',
+    amount: respData.amount ?? 0,
+    amountInCents: respData.amountInCents ?? 0,
+    currencyCode: respData.currencyCode || '',
+    paymentMethodCode: respData.method?.code || '',
+    paymentMethodName: respData.method?.name || '',
+    scheme: respData.source?.scheme || '',
+    cardType: respData.source?.cardType || '',
+    cardCategory: respData.source?.cardCategory || '',
+    issuer: respData.source?.issuer || '',
+    issuerCountry: respData.source?.issuerCountry || '',
+    last4: respData.source?.last4 || '',
+    bin: respData.source?.bin || '',
+    threeDsEnabled: respData.threeDsEnabled ?? false,
+    bookingRef: respData.bookingRef || '',
+    orderRef: respData.orderRef || '',
+    paymentRef: respData.paymentRef || '',
+    customerEmail: respData.customer?.email || '',
+    customerName: respData.customer?.fullName || '',
+    partnerName: respData.partner?.name || '',
+    partnerAccountName: respData.route?.partnerAccount?.name || '',
+    partnerAccountCode: respData.route?.partnerAccount?.code || '',
+    actions: (respData.actions || []).map((a: any) => ({
+      type: a.type || '',
+      amount: a.amount ?? 0,
+      approved: a.approved ?? false,
+      partnerResponseText: a.partnerResponseText || '',
+      createdAt: a.createdAt || '',
+    })),
+  };
+}
+
+function parseResponseError(respData: any): ResponseError | undefined {
+  if (!respData) return undefined;
+  // Check for error in response body
+  if (respData.status === 'ERROR' && respData.error) {
+    return {
+      code: respData.error.code || '',
+      message: respData.error.message || '',
+      category: respData.error.category || '',
+      status: 'ERROR',
+    };
+  }
+  // Check for error object at top level
+  if (respData.errorCode || respData.errorMessage) {
+    return {
+      code: respData.errorCode || '',
+      message: respData.errorMessage || '',
+      category: respData.errorCategory || '',
+      status: 'ERROR',
+    };
+  }
+  return undefined;
+}
+
+function parseSeatAvailability(respData: any): SeatAvailabilityInfo[] {
+  if (!respData?.data && !Array.isArray(respData)) return [];
+  const data = respData?.data || respData;
+  if (!Array.isArray(data)) return [];
+  return data.filter((d: any) => d.seats).map((d: any) => ({
+    segmentId: d.segmentId || '',
+    totalSeats: d.seats?.length || 0,
+    passengerSkippable: d.passengerSkippable ?? false,
+    sampleSeats: (d.seats || []).slice(0, 5).map((s: any) => ({
+      seatNumber: s.seatNumber || '',
+      position: s.seatPosition || '',
+      price: s.vendorPrice?.totalAmount ?? 0,
+      currency: s.vendorPrice?.currencyCode || '',
+    })),
+  }));
+}
+
 export function parseIntegrationCSV(text: string): FlattenedIntegrationEntry[] {
   const { rows } = parseCSV(text);
-  return rows.map(row => flattenIntegrationEntry(row));
+  const entries = rows.map(row => flattenIntegrationEntry(row));
+  // Sort chronologically by requestedAt
+  entries.sort((a, b) => {
+    const ta = new Date(a.requestedAt || a.timestamp || 0).getTime();
+    const tb = new Date(b.requestedAt || b.timestamp || 0).getTime();
+    return ta - tb;
+  });
+  return entries;
 }
 
 export function flattenIntegrationEntry(row: ParsedRow): FlattenedIntegrationEntry {
@@ -669,7 +863,6 @@ export function flattenIntegrationEntry(row: ParsedRow): FlattenedIntegrationEnt
   const respData = tryParse(respBody);
   const errorRaw = row.error || '';
   const type = row.type || '';
-  const url = row.url || '';
 
   // Extract itinerary from request
   const itinerary = reqData?.itinerary;
@@ -680,7 +873,7 @@ export function flattenIntegrationEntry(row: ParsedRow): FlattenedIntegrationEnt
     return `${dep} → ${arr}`;
   }).join(' · ');
 
-  // Extract supplier params - could be in reqData.supplierParams or reqData.itinerary.supplierParams
+  // Extract supplier params
   const supplierParams = reqData?.supplierParams || itinerary?.supplierParams || {};
 
   // Dynamic forms
@@ -701,6 +894,33 @@ export function flattenIntegrationEntry(row: ParsedRow): FlattenedIntegrationEnt
     insurancePackages = parseInsurancePackages(respData);
   }
 
+  // Payment details from response
+  let paymentDetails: IntegrationPaymentDetails | undefined;
+  if (type === 'GET_PAYMENT_DETAILS') {
+    paymentDetails = parsePaymentDetails(respData);
+  }
+
+  // Response error
+  const responseError = parseResponseError(respData);
+
+  // Seat availability
+  let seatAvailability: SeatAvailabilityInfo[] = [];
+  if (type === 'INTEGRATION_SEAT_AVAILABILITY' || type.includes('SEAT')) {
+    seatAvailability = parseSeatAvailability(respData);
+  }
+
+  // Build error message: prefer response error over raw error column
+  let errorMessage = '';
+  if (responseError) {
+    errorMessage = `[${responseError.category || responseError.code}] ${responseError.message}`;
+  } else if (errorRaw) {
+    errorMessage = errorRaw.split('\n')[0] || errorRaw.slice(0, 200);
+  }
+  const hasError = !!responseError || !!errorRaw;
+
+  // Passengers from request
+  const passengers = parsePassengers(reqData?.passengers);
+
   return {
     ipcc: row.ipcc || '',
     itineraryRef: row.itinerary_ref || '',
@@ -710,19 +930,20 @@ export function flattenIntegrationEntry(row: ParsedRow): FlattenedIntegrationEnt
     status: row.status || '',
     timeInMs: row.time_in_ms || '',
     type,
-    url,
+    url: row.url || '',
     wegoRef: row.wego_ref || '',
     orderId: row.order_id || '',
     brandedFareId: row.branded_fare_id || '',
     msFareId: row.ms_fare_id || '',
     queueNumber: row.queue_number || '',
-    hasError: !!errorRaw,
-    errorMessage: errorRaw ? (errorRaw.split('\n')[0] || errorRaw.slice(0, 200)) : '',
+    hasError,
+    errorMessage,
+    responseError,
     timestamp: row.timestamp || '',
     date: row.date || '',
 
     fareId: reqData?.fareId || '',
-    integrationType: reqData?.integrationType || '',
+    integrationType: reqData?.integrationType || itinerary?.integrationType || '',
     validatingAirlineCode: itinerary?.validatingAirlineCode || reqData?.validatingAirlineCode || '',
     marketingAirlineCodes: reqData?.marketingAirlineCodes || [],
     operatingAirlineCodes: reqData?.operatingAirlineCodes || [],
@@ -730,6 +951,8 @@ export function flattenIntegrationEntry(row: ParsedRow): FlattenedIntegrationEnt
     departureCountryCodes: reqData?.departureCountryCodes || [],
     arrivalCountryCodes: reqData?.arrivalCountryCodes || [],
     providerCode: reqData?.providerCode || itinerary?.providerCode || '',
+    sourceType: itinerary?.sourceType || reqData?.sourceType || '',
+    contentType: itinerary?.contentType || '',
 
     route,
     tripType: itinerary?.tripType || '',
@@ -737,16 +960,20 @@ export function flattenIntegrationEntry(row: ParsedRow): FlattenedIntegrationEnt
     legs,
     brandedFare: parseBrandedFareFromRequest(itinerary?.brandedFare),
 
+    passengers,
+    contact: parseContact(reqData),
+
     saba: parseSabaDetails(supplierParams),
     supplierSegments: parseSupplierSegments(supplierParams),
     supplierSolution: parseSupplierSolution(supplierParams),
 
     searchContext: parseSearchContext(reqData),
-    contact: parseContact(reqData),
 
     dynamicForms,
     revalidationBrands,
     insurancePackages,
+    paymentDetails,
+    seatAvailability,
 
     airlineDisclaimers: parseAirlineDisclaimers(reqData),
     currencies: reqData?.currencies || {},
