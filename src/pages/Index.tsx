@@ -6,12 +6,15 @@ import FaresTable from '@/components/FaresTable';
 import FaresStats from '@/components/FaresStats';
 import IntegrationTable from '@/components/IntegrationTable';
 import IntegrationStats from '@/components/IntegrationStats';
+import SupplierTable from '@/components/SupplierTable';
+import SupplierStats from '@/components/SupplierStats';
 import DiscrepancyPanel from '@/components/DiscrepancyPanel';
 import { parseCSV, flattenLogEntry, FlattenedLogEntry } from '@/lib/csvParser';
 import { parseFaresCSV, FlattenedFareEntry } from '@/lib/faresParser';
 import { parseIntegrationCSV, FlattenedIntegrationEntry } from '@/lib/integrationParser';
+import { parseSupplierCSV, FlattenedSupplierEntry } from '@/lib/supplierParser';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { FileText, X, Search, CreditCard, Link2, Cpu } from 'lucide-react';
+import { FileText, X, Search, CreditCard, Link2, Cpu, Server } from 'lucide-react';
 
 const Index = () => {
   const [searchEntries, setSearchEntries] = useState<FlattenedLogEntry[]>([]);
@@ -20,6 +23,8 @@ const Index = () => {
   const [faresFileName, setFaresFileName] = useState<string | null>(null);
   const [integrationEntries, setIntegrationEntries] = useState<FlattenedIntegrationEntry[]>([]);
   const [integrationFileName, setIntegrationFileName] = useState<string | null>(null);
+  const [supplierEntries, setSupplierEntries] = useState<FlattenedSupplierEntry[]>([]);
+  const [supplierFileName, setSupplierFileName] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('search');
 
   const handleSearchFileLoaded = (content: string, name: string) => {
@@ -44,11 +49,19 @@ const Index = () => {
     setActiveTab('integration');
   };
 
+  const handleSupplierFileLoaded = (content: string, name: string) => {
+    const entries = parseSupplierCSV(content);
+    setSupplierEntries(entries);
+    setSupplierFileName(name);
+    setActiveTab('supplier');
+  };
+
   const handleClearSearch = () => { setSearchEntries([]); setSearchFileName(null); };
   const handleClearFares = () => { setFaresEntries([]); setFaresFileName(null); };
   const handleClearIntegration = () => { setIntegrationEntries([]); setIntegrationFileName(null); };
+  const handleClearSupplier = () => { setSupplierEntries([]); setSupplierFileName(null); };
 
-  const hasAnyData = searchEntries.length > 0 || faresEntries.length > 0 || integrationEntries.length > 0;
+  const hasAnyData = searchEntries.length > 0 || faresEntries.length > 0 || integrationEntries.length > 0 || supplierEntries.length > 0;
 
   // Link detection
   const linkedInfo = (() => {
@@ -117,6 +130,15 @@ const Index = () => {
                 </button>
               </div>
             )}
+            {supplierFileName && (
+              <div className="flex items-center gap-2">
+                <Server className="w-3.5 h-3.5 text-muted-foreground" />
+                <span className="text-sm font-mono text-muted-foreground">{supplierFileName}</span>
+                <button onClick={handleClearSupplier} className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </header>
@@ -128,9 +150,9 @@ const Index = () => {
               View your logs clearly
             </h2>
             <p className="text-muted-foreground text-center mb-8">
-              Upload search logs, fares logs, or integration logs to inspect them
+              Upload search, fares, integration, or supplier logs to inspect them
             </p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <div>
                 <p className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                   <Search className="w-4 h-4 text-primary" /> Search Logs
@@ -148,6 +170,12 @@ const Index = () => {
                   <Cpu className="w-4 h-4 text-primary" /> Integration Logs
                 </p>
                 <FileUploader onFileLoaded={handleIntegrationFileLoaded} />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                  <Server className="w-4 h-4 text-primary" /> Supplier Logs
+                </p>
+                <FileUploader onFileLoaded={handleSupplierFileLoaded} />
               </div>
             </div>
           </div>
@@ -201,6 +229,13 @@ const Index = () => {
                       <span className="text-[10px] font-mono bg-muted px-1.5 py-0.5 rounded">{integrationEntries.length}</span>
                     )}
                   </TabsTrigger>
+                  <TabsTrigger value="supplier" disabled={supplierEntries.length === 0} className="flex items-center gap-2">
+                    <Server className="w-3.5 h-3.5" />
+                    Supplier Logs
+                    {supplierEntries.length > 0 && (
+                      <span className="text-[10px] font-mono bg-muted px-1.5 py-0.5 rounded">{supplierEntries.length}</span>
+                    )}
+                  </TabsTrigger>
                 </TabsList>
 
                 {/* Upload more */}
@@ -213,6 +248,9 @@ const Index = () => {
                   )}
                   {integrationEntries.length === 0 && (
                     <UploadButton label="+ Integration Logs" onLoaded={handleIntegrationFileLoaded} />
+                  )}
+                  {supplierEntries.length === 0 && (
+                    <UploadButton label="+ Supplier Logs" onLoaded={handleSupplierFileLoaded} />
                   )}
                 </div>
               </div>
@@ -231,6 +269,11 @@ const Index = () => {
                 <DiscrepancyPanel entries={integrationEntries} />
                 <IntegrationStats entries={integrationEntries} />
                 <IntegrationTable entries={integrationEntries} />
+              </TabsContent>
+
+              <TabsContent value="supplier" className="space-y-6">
+                <SupplierStats entries={supplierEntries} />
+                <SupplierTable entries={supplierEntries} />
               </TabsContent>
             </Tabs>
           </>
