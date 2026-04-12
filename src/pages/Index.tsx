@@ -4,16 +4,21 @@ import LogTable from '@/components/LogTable';
 import LogStats from '@/components/LogStats';
 import FaresTable from '@/components/FaresTable';
 import FaresStats from '@/components/FaresStats';
+import IntegrationTable from '@/components/IntegrationTable';
+import IntegrationStats from '@/components/IntegrationStats';
 import { parseCSV, flattenLogEntry, FlattenedLogEntry } from '@/lib/csvParser';
 import { parseFaresCSV, FlattenedFareEntry } from '@/lib/faresParser';
+import { parseIntegrationCSV, FlattenedIntegrationEntry } from '@/lib/integrationParser';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { FileText, X, Search, CreditCard, Link2 } from 'lucide-react';
+import { FileText, X, Search, CreditCard, Link2, Cpu } from 'lucide-react';
 
 const Index = () => {
   const [searchEntries, setSearchEntries] = useState<FlattenedLogEntry[]>([]);
   const [searchFileName, setSearchFileName] = useState<string | null>(null);
   const [faresEntries, setFaresEntries] = useState<FlattenedFareEntry[]>([]);
   const [faresFileName, setFaresFileName] = useState<string | null>(null);
+  const [integrationEntries, setIntegrationEntries] = useState<FlattenedIntegrationEntry[]>([]);
+  const [integrationFileName, setIntegrationFileName] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('search');
 
   const handleSearchFileLoaded = (content: string, name: string) => {
@@ -31,15 +36,22 @@ const Index = () => {
     setActiveTab('fares');
   };
 
+  const handleIntegrationFileLoaded = (content: string, name: string) => {
+    const entries = parseIntegrationCSV(content);
+    setIntegrationEntries(entries);
+    setIntegrationFileName(name);
+    setActiveTab('integration');
+  };
+
   const handleClearSearch = () => { setSearchEntries([]); setSearchFileName(null); };
   const handleClearFares = () => { setFaresEntries([]); setFaresFileName(null); };
+  const handleClearIntegration = () => { setIntegrationEntries([]); setIntegrationFileName(null); };
 
-  const hasAnyData = searchEntries.length > 0 || faresEntries.length > 0;
+  const hasAnyData = searchEntries.length > 0 || faresEntries.length > 0 || integrationEntries.length > 0;
 
-  // Link detection: find common msfareid between search and fares
+  // Link detection
   const linkedInfo = (() => {
     if (searchEntries.length === 0 || faresEntries.length === 0) return null;
-    // Search logs have provider_code which appears in msfareid
     const fareProviders = new Set(faresEntries.map(f => {
       const parts = f.msfareid.split(':');
       return parts[1]?.replace(/_/g, '.') || '';
@@ -51,6 +63,19 @@ const Index = () => {
       providers: [...fareProviders],
       fareOrderId: faresEntries[0]?.paymentorderid || '',
     };
+  })();
+
+  // Integration link detection
+  const integrationLinked = (() => {
+    if (integrationEntries.length === 0) return null;
+    const links: string[] = [];
+    const fareIds = new Set(faresEntries.map(f => f.msfareid).filter(Boolean));
+    const intFareIds = new Set(integrationEntries.map(e => e.msFareId).filter(Boolean));
+    const sharedFareIds = [...intFareIds].filter(id => fareIds.has(id));
+    if (sharedFareIds.length > 0) links.push(`${sharedFareIds.length} shared fare ID(s) with fares logs`);
+    const wegoRefs = new Set(integrationEntries.map(e => e.wegoRef).filter(Boolean));
+    if (wegoRefs.size > 0) links.push(`Wego ref: ${[...wegoRefs].join(', ')}`);
+    return links.length > 0 ? links : null;
   })();
 
   return (
@@ -82,20 +107,29 @@ const Index = () => {
                 </button>
               </div>
             )}
+            {integrationFileName && (
+              <div className="flex items-center gap-2">
+                <Cpu className="w-3.5 h-3.5 text-muted-foreground" />
+                <span className="text-sm font-mono text-muted-foreground">{integrationFileName}</span>
+                <button onClick={handleClearIntegration} className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </header>
 
       <main className="max-w-[1600px] mx-auto px-6 py-8 space-y-6">
         {!hasAnyData ? (
-          <div className="max-w-2xl mx-auto mt-12">
+          <div className="max-w-3xl mx-auto mt-12">
             <h2 className="text-2xl font-bold text-foreground text-center mb-2">
               View your logs clearly
             </h2>
             <p className="text-muted-foreground text-center mb-8">
-              Upload search logs or fares logs to inspect them in a clean, searchable format
+              Upload search logs, fares logs, or integration logs to inspect them
             </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div>
                 <p className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                   <Search className="w-4 h-4 text-primary" /> Search Logs
@@ -108,11 +142,17 @@ const Index = () => {
                 </p>
                 <FileUploader onFileLoaded={handleFaresFileLoaded} />
               </div>
+              <div>
+                <p className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                  <Cpu className="w-4 h-4 text-primary" /> Integration Logs
+                </p>
+                <FileUploader onFileLoaded={handleIntegrationFileLoaded} />
+              </div>
             </div>
           </div>
         ) : (
           <>
-            {/* Link banner */}
+            {/* Link banners */}
             {linkedInfo && (
               <div className="bg-primary/10 border border-primary/30 rounded-lg px-4 py-3 flex items-center gap-3">
                 <Link2 className="w-4 h-4 text-primary shrink-0" />
@@ -126,9 +166,18 @@ const Index = () => {
                 </p>
               </div>
             )}
+            {integrationLinked && (
+              <div className="bg-primary/10 border border-primary/30 rounded-lg px-4 py-3 flex items-center gap-3">
+                <Cpu className="w-4 h-4 text-primary shrink-0" />
+                <p className="text-sm text-foreground">
+                  <span className="font-semibold">Integration linked:</span>{' '}
+                  {integrationLinked.join(' · ')}
+                </p>
+              </div>
+            )}
 
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-2">
                 <TabsList>
                   <TabsTrigger value="search" disabled={searchEntries.length === 0} className="flex items-center gap-2">
                     <Search className="w-3.5 h-3.5" />
@@ -144,6 +193,13 @@ const Index = () => {
                       <span className="text-[10px] font-mono bg-muted px-1.5 py-0.5 rounded">{faresEntries.length}</span>
                     )}
                   </TabsTrigger>
+                  <TabsTrigger value="integration" disabled={integrationEntries.length === 0} className="flex items-center gap-2">
+                    <Cpu className="w-3.5 h-3.5" />
+                    Integration Logs
+                    {integrationEntries.length > 0 && (
+                      <span className="text-[10px] font-mono bg-muted px-1.5 py-0.5 rounded">{integrationEntries.length}</span>
+                    )}
+                  </TabsTrigger>
                 </TabsList>
 
                 {/* Upload more */}
@@ -153,6 +209,9 @@ const Index = () => {
                   )}
                   {faresEntries.length === 0 && (
                     <UploadButton label="+ Fares Logs" onLoaded={handleFaresFileLoaded} />
+                  )}
+                  {integrationEntries.length === 0 && (
+                    <UploadButton label="+ Integration Logs" onLoaded={handleIntegrationFileLoaded} />
                   )}
                 </div>
               </div>
@@ -165,6 +224,11 @@ const Index = () => {
               <TabsContent value="fares" className="space-y-6">
                 <FaresStats entries={faresEntries} />
                 <FaresTable entries={faresEntries} />
+              </TabsContent>
+
+              <TabsContent value="integration" className="space-y-6">
+                <IntegrationStats entries={integrationEntries} />
+                <IntegrationTable entries={integrationEntries} />
               </TabsContent>
             </Tabs>
           </>
