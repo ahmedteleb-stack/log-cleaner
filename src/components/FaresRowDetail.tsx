@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { FlattenedFareEntry } from '@/lib/faresParser';
-import { ActionMapping, ExtractedDetails, UTADetail } from '@/lib/faresActionMapper';
+import { ActionMapping, ExtractedDetails } from '@/lib/faresActionMapper';
 import { AlertTriangle, Code, Eye, EyeOff, ChevronDown, ChevronRight } from 'lucide-react';
 
 interface FaresRowDetailProps {
