@@ -282,6 +282,7 @@ export interface ExtractedDetails {
   oldPrice?: number;
   newPrice?: number;
   orderItems?: { name: string; type: string; price: number; currency: string }[];
+  airlineDisclaimers?: string[];
   summaryLines?: string[]; // fallback text lines
 }
 
