@@ -527,4 +527,8 @@ function formatPassengerId(id: string): string {
   return raw.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/([A-Z]+)/g, ' $1').trim();
 }
 
+function formatUTAType(type: string): string {
+  return type.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
 export default FaresRowDetail;
