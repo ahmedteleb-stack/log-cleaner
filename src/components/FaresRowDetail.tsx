@@ -202,30 +202,137 @@ const FaresRowDetail = ({ entry, action, details, defaultShowRaw }: FaresRowDeta
         {details.brandedFares && details.brandedFares.length > 0 && (
           <Section title={`Branded Fares (${details.brandedFares.length})`} icon="🎫">
             {details.brandedFares.map((bf, i) => (
-              <div key={i} className="border border-border/50 rounded-md p-2.5 space-y-1">
-                <div className="flex items-center gap-2">
+              <div key={i} className="border border-border/50 rounded-md p-2.5 space-y-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-[11px] font-semibold text-foreground">{bf.brandName}</span>
                   <span className="text-[10px] text-muted-foreground">Leg {bf.legId}</span>
                   <span className="text-[10px] font-mono text-primary">{fmtAmount(bf.totalAmount, bf.currencyCode)}</span>
+                  {bf.totalAmountUsd !== undefined && <span className="text-[10px] font-mono text-muted-foreground">({fmtAmount(bf.totalAmountUsd, 'USD')})</span>}
                   {bf.refundType && <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{bf.refundType}</span>}
                 </div>
                 <KV label="Fare ID" value={bf.id} mono />
+                {bf.totalBookingFee !== undefined && <KV label="Booking Fee" value={fmtAmount(bf.totalBookingFee, bf.currencyCode)} />}
+
+                {/* Penalties */}
                 {bf.penalties && bf.penalties.length > 0 && (
-                  <div className="text-[10px] text-muted-foreground">
-                    Penalties: {bf.penalties.map(p => `${p.type}: ${fmtAmount(p.amount, p.currencyCode)}`).join(' · ')}
+                  <div className="text-[10px]">
+                    <span className="font-semibold text-muted-foreground">Penalties: </span>
+                    {bf.penalties.map((p, j) => (
+                      <span key={j} className="inline-flex items-center gap-1 mr-2">
+                        <span className="px-1 py-0.5 rounded bg-destructive/10 text-destructive">{p.type}: {fmtAmount(p.amount, p.currencyCode)}</span>
+                        {p.amountUsd !== undefined && <span className="text-muted-foreground">({fmtAmount(p.amountUsd, 'USD')})</span>}
+                      </span>
+                    ))}
                   </div>
                 )}
+
+                {/* Per-passenger pricing with resolved taxes */}
                 {bf.passengerInfos && bf.passengerInfos.length > 0 && (
-                  <div className="text-[10px] text-muted-foreground">
-                    Per pax: {bf.passengerInfos.map(pi => `${pi.type}: ${fmtAmount(pi.amount, pi.currencyCode)} (tax: ${fmtAmount(pi.taxAmount, pi.currencyCode)})`).join(' · ')}
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Per Passenger</p>
+                    {bf.passengerInfos.map((pi, j) => (
+                      <div key={j} className="ml-2 space-y-0.5 pb-1 border-b border-border/30 last:border-0">
+                        <div className="text-[10px] text-foreground">
+                          <span className="font-semibold">{pi.type}</span>: {fmtAmount(pi.amount, pi.currencyCode)} (tax: {fmtAmount(pi.taxAmount, pi.currencyCode)})
+                        </div>
+                        {pi.taxes && pi.taxes.length > 0 && (
+                          <details className="ml-2">
+                            <summary className="text-[9px] text-muted-foreground cursor-pointer hover:text-foreground">
+                              {pi.taxes.length} tax item(s) — click to expand
+                            </summary>
+                            <div className="mt-1 space-y-0.5 pl-2 border-l border-border/50">
+                              {pi.taxes.map((t, k) => (
+                                <div key={k} className="text-[9px] text-foreground">
+                                  {t.code && <span className="font-mono text-primary mr-1">{t.code}</span>}
+                                  {t.description} — {fmtAmount(t.amount, t.currencyCode)}
+                                  {t.amountUsd !== undefined && <span className="text-muted-foreground ml-1">({fmtAmount(t.amountUsd, 'USD')})</span>}
+                                </div>
+                              ))}
+                            </div>
+                          </details>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 )}
-                {bf.baggages && bf.baggages.length > 0 && (
-                  <div className="text-[10px] text-muted-foreground">
-                    Baggage: {bf.baggages.map(b => `${b.weightText || `${b.weight}${b.unit}`} ${b.included ? '(included)' : ''}`).join(', ')}
+
+                {/* Per-leg baggage */}
+                {bf.perLegBaggages && bf.perLegBaggages.length > 0 && (
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Baggage Per Leg</p>
+                    {bf.perLegBaggages.map((lb, j) => (
+                      <div key={j} className="ml-2 text-[10px] text-foreground pb-1 border-b border-border/30 last:border-0">
+                        <span className="font-semibold">Leg {j + 1}: </span>
+                        {lb.baggages.length === 0 ? <span className="text-muted-foreground">No baggage</span> : lb.baggages.map((b, k) => (
+                          <span key={k} className="inline-flex items-center gap-1 mr-2">
+                            <span className={`px-1 py-0.5 rounded ${b.included ? 'bg-badge-success/20 text-badge-success-foreground' : 'bg-muted text-muted-foreground'}`}>
+                              {b.type}: {b.weightText || `${b.weight || '—'}${b.unit || ''}`} ({b.pieceCount ?? '—'} pc)
+                              {b.included ? ' ✅' : ''}
+                            </span>
+                          </span>
+                        ))}
+                        {lb.baggages.some(b => b.dimensionText) && (
+                          <div className="text-[9px] text-muted-foreground ml-2">
+                            {lb.baggages.filter(b => b.dimensionText).map((b, k) => (
+                              <span key={k} className="mr-2">{b.type}: {b.dimensionText}</span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Fees (EXCHANGE, REFUND) */}
+                {bf.fees && bf.fees.length > 0 && (
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Fees</p>
+                    <div className="flex flex-wrap gap-2">
+                      {bf.fees.map((f, j) => (
+                        <span key={j} className="inline-flex text-[10px] px-1.5 py-0.5 rounded bg-muted text-foreground">
+                          {f.type}: {fmtAmount(f.amount, bf.currencyCode)}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* UTAs (policies) */}
+                {bf.utas && bf.utas.length > 0 && (
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Policies (UTA)</p>
+                    <div className="space-y-0.5">
+                      {bf.utas.map((u, j) => (
+                        <div key={j} className="text-[10px] text-foreground flex items-center gap-2">
+                          <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold ${
+                            u.key === 'included' ? 'bg-badge-success/20 text-badge-success-foreground' :
+                            u.key === 'not_included' || u.key === 'not_allowed' ? 'bg-destructive/10 text-destructive' :
+                            'bg-badge-warning/20 text-badge-warning-foreground'
+                          }`}>
+                            {u.key.replace(/_/g, ' ')}
+                          </span>
+                          <span>{formatUTAType(u.type)}</span>
+                          {u.attributes && u.attributes.amount !== undefined && (
+                            <span className="text-muted-foreground">({fmtAmount(u.attributes.amount, u.attributes.currencyCode)})</span>
+                          )}
+                          {u.attributes && u.attributes.weight !== undefined && (
+                            <span className="text-muted-foreground">({u.attributes.weight}{u.attributes.unit}, {u.attributes.pieceCount} pc)</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
+            ))}
+          </Section>
+        )}
+
+        {/* Airline Disclaimers */}
+        {details.airlineDisclaimers && details.airlineDisclaimers.length > 0 && (
+          <Section title="Airline Disclaimers" icon="⚠️" defaultOpen={false}>
+            {details.airlineDisclaimers.map((note, i) => (
+              <p key={i} className="text-[10px] text-foreground">{note}</p>
             ))}
           </Section>
         )}
