@@ -198,6 +198,18 @@ export interface FeeDescDetail {
   amount: number;
 }
 
+export interface UTADetail {
+  type: string;
+  key: string;
+  code: string;
+  attributes?: Record<string, any>;
+}
+
+export interface PerLegBaggage {
+  legIndex: number;
+  baggages: BaggageDescDetail[];
+}
+
 export interface BrandedFareDetail {
   id: string;
   legId: number | string;
@@ -206,9 +218,14 @@ export interface BrandedFareDetail {
   totalAmount: number;
   currencyCode: string;
   totalAmountUsd?: number;
-  penalties?: { type: string; amount: number; currencyCode: string }[];
-  passengerInfos?: { type: string; amount: number; taxAmount: number; currencyCode: string }[];
+  totalBookingFee?: number;
+  totalBookingFeeUsd?: number;
+  penalties?: { type: string; amount: number; amountUsd?: number; currencyCode: string }[];
+  passengerInfos?: { type: string; amount: number; taxAmount: number; currencyCode: string; taxes?: TaxDetail[] }[];
   baggages?: BaggageDescDetail[];
+  perLegBaggages?: PerLegBaggage[];
+  fees?: FeeDescDetail[];
+  utas?: UTADetail[];
 }
 
 export interface SeatAssignment {
