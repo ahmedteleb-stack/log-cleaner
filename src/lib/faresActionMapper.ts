@@ -198,6 +198,18 @@ export interface FeeDescDetail {
   amount: number;
 }
 
+export interface UTADetail {
+  type: string;
+  key: string;
+  code: string;
+  attributes?: Record<string, any>;
+}
+
+export interface PerLegBaggage {
+  legIndex: number;
+  baggages: BaggageDescDetail[];
+}
+
 export interface BrandedFareDetail {
   id: string;
   legId: number | string;
@@ -206,9 +218,14 @@ export interface BrandedFareDetail {
   totalAmount: number;
   currencyCode: string;
   totalAmountUsd?: number;
-  penalties?: { type: string; amount: number; currencyCode: string }[];
-  passengerInfos?: { type: string; amount: number; taxAmount: number; currencyCode: string }[];
+  totalBookingFee?: number;
+  totalBookingFeeUsd?: number;
+  penalties?: { type: string; amount: number; amountUsd?: number; currencyCode: string }[];
+  passengerInfos?: { type: string; amount: number; taxAmount: number; currencyCode: string; taxes?: TaxDetail[] }[];
   baggages?: BaggageDescDetail[];
+  perLegBaggages?: PerLegBaggage[];
+  fees?: FeeDescDetail[];
+  utas?: UTADetail[];
 }
 
 export interface SeatAssignment {
@@ -265,6 +282,7 @@ export interface ExtractedDetails {
   oldPrice?: number;
   newPrice?: number;
   orderItems?: { name: string; type: string; price: number; currency: string }[];
+  airlineDisclaimers?: string[];
   summaryLines?: string[]; // fallback text lines
 }
 
@@ -430,7 +448,7 @@ function parseContact(c: any): ContactDetail | undefined {
   };
 }
 
-function parseBrandedFares(fares: any[], baggageDescs?: any[]): BrandedFareDetail[] {
+function parseBrandedFares(fares: any[], baggageDescs?: any[], taxDescs?: any[], feeDescs?: any[], utaDescs?: any[]): BrandedFareDetail[] {
   return (fares || []).map((f: any) => {
     const bf: BrandedFareDetail = {
       id: f.id || '',
@@ -440,31 +458,81 @@ function parseBrandedFares(fares: any[], baggageDescs?: any[]): BrandedFareDetai
       totalAmount: f.price?.totalAmount ?? 0,
       currencyCode: f.price?.currencyCode || '',
       totalAmountUsd: f.price?.totalAmountUsd,
+      totalBookingFee: f.price?.totalBookingFee,
+      totalBookingFeeUsd: f.price?.totalBookingFeeUsd,
       penalties: (f.penalties || []).map((p: any) => ({
         type: p.type || '',
         amount: p.amount ?? 0,
+        amountUsd: p.amountUsd,
         currencyCode: p.currencyCode || '',
       })),
-      passengerInfos: (f.passengerInfos || []).map((pi: any) => ({
-        type: pi.type || '',
-        amount: pi.price?.amount ?? 0,
-        taxAmount: pi.price?.taxAmount ?? 0,
-        currencyCode: pi.price?.currencyCode || '',
-      })),
+      passengerInfos: (f.passengerInfos || []).map((pi: any) => {
+        const info: any = {
+          type: pi.type || '',
+          amount: pi.price?.amount ?? 0,
+          taxAmount: pi.price?.taxAmount ?? 0,
+          currencyCode: pi.price?.currencyCode || '',
+        };
+        // Resolve tax IDs to tax details
+        if (taxDescs && pi.taxes) {
+          info.taxes = (pi.taxes as number[]).map((id: number) => {
+            const td = taxDescs.find((t: any) => t.id === id);
+            return td ? { code: td.code, description: td.description, amount: td.amount, amountUsd: td.amountUsd, currencyCode: td.currencyCode } : { description: `Tax #${id}`, amount: 0, currencyCode: '' };
+          });
+        }
+        return info;
+      }),
     };
-    // Resolve baggage references if baggageDescs available
+
+    // Resolve per-leg baggages: baggages is [[[bagIds for leg1]], [[bagIds for leg2]]]
     if (baggageDescs && f.passengerInfos?.[0]?.baggages) {
-      const bagIds = new Set<number>();
-      const extractIds = (arr: any) => {
-        if (Array.isArray(arr)) arr.forEach((a: any) => extractIds(a));
-        else if (typeof arr === 'number') bagIds.add(arr);
-      };
-      extractIds(f.passengerInfos[0].baggages);
-      bf.baggages = Array.from(bagIds).map(id => {
-        const bd = baggageDescs.find((b: any) => b.id === id);
-        return bd ? { id: bd.id, type: bd.type || '', weight: bd.weight, unit: bd.unit || '', pieceCount: bd.pieceCount, weightText: bd.weightText || '', dimensionText: bd.dimensionText || '', included: bd.included } : { type: 'unknown', weight: 0, unit: '' };
-      }).filter(b => b.type !== 'unknown');
+      const legBaggages = f.passengerInfos[0].baggages;
+      if (Array.isArray(legBaggages)) {
+        bf.perLegBaggages = legBaggages.map((legArr: any, legIdx: number) => {
+          const bagIds = new Set<number>();
+          const extractIds = (arr: any) => {
+            if (Array.isArray(arr)) arr.forEach((a: any) => extractIds(a));
+            else if (typeof arr === 'number') bagIds.add(arr);
+          };
+          extractIds(legArr);
+          return {
+            legIndex: legIdx,
+            baggages: Array.from(bagIds).map(id => {
+              const bd = baggageDescs.find((b: any) => b.id === id);
+              return bd ? { id: bd.id, type: bd.type || '', weight: bd.weight, unit: bd.unit || '', pieceCount: bd.pieceCount, weightText: bd.weightText || '', dimensionText: bd.dimensionText || '', included: bd.included } : { type: 'unknown', weight: 0, unit: '' };
+            }).filter(b => b.type !== 'unknown'),
+          };
+        });
+        // Also flatten all unique baggages
+        const allBagIds = new Set<number>();
+        const extractAll = (arr: any) => {
+          if (Array.isArray(arr)) arr.forEach((a: any) => extractAll(a));
+          else if (typeof arr === 'number') allBagIds.add(arr);
+        };
+        extractAll(f.passengerInfos[0].baggages);
+        bf.baggages = Array.from(allBagIds).map(id => {
+          const bd = baggageDescs.find((b: any) => b.id === id);
+          return bd ? { id: bd.id, type: bd.type || '', weight: bd.weight, unit: bd.unit || '', pieceCount: bd.pieceCount, weightText: bd.weightText || '', dimensionText: bd.dimensionText || '', included: bd.included } : { type: 'unknown', weight: 0, unit: '' };
+        }).filter(b => b.type !== 'unknown');
+      }
     }
+
+    // Resolve fee IDs
+    if (feeDescs && f.passengerInfos?.[0]?.fees) {
+      bf.fees = (f.passengerInfos[0].fees as number[]).map((id: number) => {
+        const fd = feeDescs.find((f: any) => f.id === id);
+        return fd ? { id: fd.id, type: fd.type || '', amount: fd.amount ?? 0 } : { type: `Fee #${id}`, amount: 0 };
+      });
+    }
+
+    // Resolve UTA IDs
+    if (utaDescs && f.utas) {
+      bf.utas = (f.utas as number[]).map((id: number) => {
+        const ud = utaDescs.find((u: any) => u.id === id);
+        return ud ? { type: ud.type || '', key: ud.key || '', code: ud.code || '', attributes: ud.attributes } : { type: `UTA #${id}`, key: '', code: '' };
+      });
+    }
+
     return bf;
   });
 }
@@ -525,7 +593,42 @@ function extractRevalidateDetails(data: any, d: ExtractedDetails) {
       totalAmountUsd: data.priceInfo.newTotalAmountInUsd,
     };
   }
-  if (data.brandedFares) d.brandedFares = parseBrandedFares(data.brandedFares, data.baggageDescs);
+  if (data.brandedFares) d.brandedFares = parseBrandedFares(data.brandedFares, data.baggageDescs, data.taxDescs, data.feeDescs, data.utaDescs);
+
+  // Handle /fares/compare structure: fares is an object keyed by fare ID
+  if (data.fares && typeof data.fares === 'object') {
+    const allBrandedFares: any[] = [];
+    for (const fareKey of Object.keys(data.fares)) {
+      const fareObj = data.fares[fareKey];
+      if (fareObj?.brandedFares) {
+        allBrandedFares.push(...fareObj.brandedFares);
+      }
+    }
+    if (allBrandedFares.length > 0) {
+      d.brandedFares = parseBrandedFares(allBrandedFares, data.baggageDescs, data.taxDescs, data.feeDescs, data.utaDescs);
+      // Extract price from first branded fare if not already set
+      if (!d.price && allBrandedFares[0]?.price) {
+        const p = allBrandedFares[0].price;
+        d.price = {
+          currencyCode: p.currencyCode || '',
+          totalAmount: p.totalAmount ?? 0,
+          totalOriginalAmount: p.totalOriginalAmount,
+          totalTaxAmount: p.totalTaxAmount,
+          totalBookingFee: p.totalBookingFee,
+          totalAmountUsd: p.totalAmountUsd,
+          totalOriginalAmountUsd: p.totalOriginalAmountUsd,
+          totalTaxAmountUsd: p.totalTaxAmountUsd,
+          totalBookingFeeUsd: p.totalBookingFeeUsd,
+        };
+      }
+    }
+  }
+
+  // Airline disclaimers
+  if (data.airlineDisclaimerDescs) {
+    d.airlineDisclaimers = data.airlineDisclaimerDescs.map((a: any) => (a.note || '').replace(/<[^>]+>/g, ''));
+  }
+
   d.policy = parsePolicy(data);
 }
 
