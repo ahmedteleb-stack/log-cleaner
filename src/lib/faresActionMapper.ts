@@ -593,7 +593,42 @@ function extractRevalidateDetails(data: any, d: ExtractedDetails) {
       totalAmountUsd: data.priceInfo.newTotalAmountInUsd,
     };
   }
-  if (data.brandedFares) d.brandedFares = parseBrandedFares(data.brandedFares, data.baggageDescs);
+  if (data.brandedFares) d.brandedFares = parseBrandedFares(data.brandedFares, data.baggageDescs, data.taxDescs, data.feeDescs, data.utaDescs);
+
+  // Handle /fares/compare structure: fares is an object keyed by fare ID
+  if (data.fares && typeof data.fares === 'object') {
+    const allBrandedFares: any[] = [];
+    for (const fareKey of Object.keys(data.fares)) {
+      const fareObj = data.fares[fareKey];
+      if (fareObj?.brandedFares) {
+        allBrandedFares.push(...fareObj.brandedFares);
+      }
+    }
+    if (allBrandedFares.length > 0) {
+      d.brandedFares = parseBrandedFares(allBrandedFares, data.baggageDescs, data.taxDescs, data.feeDescs, data.utaDescs);
+      // Extract price from first branded fare if not already set
+      if (!d.price && allBrandedFares[0]?.price) {
+        const p = allBrandedFares[0].price;
+        d.price = {
+          currencyCode: p.currencyCode || '',
+          totalAmount: p.totalAmount ?? 0,
+          totalOriginalAmount: p.totalOriginalAmount,
+          totalTaxAmount: p.totalTaxAmount,
+          totalBookingFee: p.totalBookingFee,
+          totalAmountUsd: p.totalAmountUsd,
+          totalOriginalAmountUsd: p.totalOriginalAmountUsd,
+          totalTaxAmountUsd: p.totalTaxAmountUsd,
+          totalBookingFeeUsd: p.totalBookingFeeUsd,
+        };
+      }
+    }
+  }
+
+  // Airline disclaimers
+  if (data.airlineDisclaimerDescs) {
+    d.airlineDisclaimers = data.airlineDisclaimerDescs.map((a: any) => (a.note || '').replace(/<[^>]+>/g, ''));
+  }
+
   d.policy = parsePolicy(data);
 }
 
