@@ -448,7 +448,7 @@ function parseContact(c: any): ContactDetail | undefined {
   };
 }
 
-function parseBrandedFares(fares: any[], baggageDescs?: any[]): BrandedFareDetail[] {
+function parseBrandedFares(fares: any[], baggageDescs?: any[], taxDescs?: any[], feeDescs?: any[], utaDescs?: any[]): BrandedFareDetail[] {
   return (fares || []).map((f: any) => {
     const bf: BrandedFareDetail = {
       id: f.id || '',
@@ -458,31 +458,81 @@ function parseBrandedFares(fares: any[], baggageDescs?: any[]): BrandedFareDetai
       totalAmount: f.price?.totalAmount ?? 0,
       currencyCode: f.price?.currencyCode || '',
       totalAmountUsd: f.price?.totalAmountUsd,
+      totalBookingFee: f.price?.totalBookingFee,
+      totalBookingFeeUsd: f.price?.totalBookingFeeUsd,
       penalties: (f.penalties || []).map((p: any) => ({
         type: p.type || '',
         amount: p.amount ?? 0,
+        amountUsd: p.amountUsd,
         currencyCode: p.currencyCode || '',
       })),
-      passengerInfos: (f.passengerInfos || []).map((pi: any) => ({
-        type: pi.type || '',
-        amount: pi.price?.amount ?? 0,
-        taxAmount: pi.price?.taxAmount ?? 0,
-        currencyCode: pi.price?.currencyCode || '',
-      })),
+      passengerInfos: (f.passengerInfos || []).map((pi: any) => {
+        const info: any = {
+          type: pi.type || '',
+          amount: pi.price?.amount ?? 0,
+          taxAmount: pi.price?.taxAmount ?? 0,
+          currencyCode: pi.price?.currencyCode || '',
+        };
+        // Resolve tax IDs to tax details
+        if (taxDescs && pi.taxes) {
+          info.taxes = (pi.taxes as number[]).map((id: number) => {
+            const td = taxDescs.find((t: any) => t.id === id);
+            return td ? { code: td.code, description: td.description, amount: td.amount, amountUsd: td.amountUsd, currencyCode: td.currencyCode } : { description: `Tax #${id}`, amount: 0, currencyCode: '' };
+          });
+        }
+        return info;
+      }),
     };
-    // Resolve baggage references if baggageDescs available
+
+    // Resolve per-leg baggages: baggages is [[[bagIds for leg1]], [[bagIds for leg2]]]
     if (baggageDescs && f.passengerInfos?.[0]?.baggages) {
-      const bagIds = new Set<number>();
-      const extractIds = (arr: any) => {
-        if (Array.isArray(arr)) arr.forEach((a: any) => extractIds(a));
-        else if (typeof arr === 'number') bagIds.add(arr);
-      };
-      extractIds(f.passengerInfos[0].baggages);
-      bf.baggages = Array.from(bagIds).map(id => {
-        const bd = baggageDescs.find((b: any) => b.id === id);
-        return bd ? { id: bd.id, type: bd.type || '', weight: bd.weight, unit: bd.unit || '', pieceCount: bd.pieceCount, weightText: bd.weightText || '', dimensionText: bd.dimensionText || '', included: bd.included } : { type: 'unknown', weight: 0, unit: '' };
-      }).filter(b => b.type !== 'unknown');
+      const legBaggages = f.passengerInfos[0].baggages;
+      if (Array.isArray(legBaggages)) {
+        bf.perLegBaggages = legBaggages.map((legArr: any, legIdx: number) => {
+          const bagIds = new Set<number>();
+          const extractIds = (arr: any) => {
+            if (Array.isArray(arr)) arr.forEach((a: any) => extractIds(a));
+            else if (typeof arr === 'number') bagIds.add(arr);
+          };
+          extractIds(legArr);
+          return {
+            legIndex: legIdx,
+            baggages: Array.from(bagIds).map(id => {
+              const bd = baggageDescs.find((b: any) => b.id === id);
+              return bd ? { id: bd.id, type: bd.type || '', weight: bd.weight, unit: bd.unit || '', pieceCount: bd.pieceCount, weightText: bd.weightText || '', dimensionText: bd.dimensionText || '', included: bd.included } : { type: 'unknown', weight: 0, unit: '' };
+            }).filter(b => b.type !== 'unknown'),
+          };
+        });
+        // Also flatten all unique baggages
+        const allBagIds = new Set<number>();
+        const extractAll = (arr: any) => {
+          if (Array.isArray(arr)) arr.forEach((a: any) => extractAll(a));
+          else if (typeof arr === 'number') allBagIds.add(arr);
+        };
+        extractAll(f.passengerInfos[0].baggages);
+        bf.baggages = Array.from(allBagIds).map(id => {
+          const bd = baggageDescs.find((b: any) => b.id === id);
+          return bd ? { id: bd.id, type: bd.type || '', weight: bd.weight, unit: bd.unit || '', pieceCount: bd.pieceCount, weightText: bd.weightText || '', dimensionText: bd.dimensionText || '', included: bd.included } : { type: 'unknown', weight: 0, unit: '' };
+        }).filter(b => b.type !== 'unknown');
+      }
     }
+
+    // Resolve fee IDs
+    if (feeDescs && f.passengerInfos?.[0]?.fees) {
+      bf.fees = (f.passengerInfos[0].fees as number[]).map((id: number) => {
+        const fd = feeDescs.find((f: any) => f.id === id);
+        return fd ? { id: fd.id, type: fd.type || '', amount: fd.amount ?? 0 } : { type: `Fee #${id}`, amount: 0 };
+      });
+    }
+
+    // Resolve UTA IDs
+    if (utaDescs && f.utas) {
+      bf.utas = (f.utas as number[]).map((id: number) => {
+        const ud = utaDescs.find((u: any) => u.id === id);
+        return ud ? { type: ud.type || '', key: ud.key || '', code: ud.code || '', attributes: ud.attributes } : { type: `UTA #${id}`, key: '', code: '' };
+      });
+    }
+
     return bf;
   });
 }
